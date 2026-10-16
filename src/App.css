@@ -1,0 +1,40 @@
+/* ============================================================
+   CONTENEDOR DEL JUEGO
+   ============================================================ */
+
+.juego {
+    max-width: 500px;
+    margin: 0 auto;
+    padding: 20px 16px 40px;
+}
+
+/* ---------- Mensaje de estado ---------- */
+
+.estado {
+    min-height: 18px;
+    margin: 12px 0 0;
+    text-align: center;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--slate-500);
+}
+
+.estado.victoria {
+    color: var(--brand-600);
+    font-weight: 700;
+}
+
+/* ---------- Placeholder mientras se genera ---------- */
+
+.tablero-cargando {
+    width: max-content;
+    margin: 0 auto;
+    padding: 60px 40px;
+    background: #ffffff;
+    border: 3px solid var(--slate-800);
+    border-radius: 16px;
+    box-shadow: var(--sombra-elevada);
+    color: var(--slate-500);
+    font-size: 13px;
+    font-weight: 600;
+}

@@ -1,0 +1,24 @@
+/* ============================================================
+   TABLERO
+   ============================================================ */
+
+.tablero-envoltorio {
+    position: relative;
+    width: max-content;
+    margin: 0 auto;
+    background: #ffffff;
+    border: 3px solid var(--slate-800);
+    border-radius: 16px;
+    box-shadow: var(--sombra-elevada);
+    padding: 2px;
+    overflow: hidden;
+}
+
+.tablero {
+    display: grid;
+    grid-template-columns: repeat(9, var(--celda));
+    grid-template-rows: repeat(9, var(--celda));
+    background: #ffffff;
+    overflow: hidden;
+    border-radius: 12px;
+}

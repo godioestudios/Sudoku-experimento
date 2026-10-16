@@ -1,0 +1,83 @@
+/* ============================================================
+   MODAL DE VICTORIA
+   ============================================================ */
+
+.modal {
+    position: fixed;
+    inset: 0;
+    background: rgba(15, 23, 42, 0.55);
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    z-index: 100;
+}
+
+.modal-tarjeta {
+    background: #fff;
+    border-radius: 20px;
+    padding: 28px 26px;
+    width: 100%;
+    max-width: 340px;
+    text-align: center;
+    box-shadow: 0 20px 50px -12px rgba(15, 23, 42, 0.4);
+    animation: aparecer 0.22s ease-out;
+}
+
+@keyframes aparecer {
+    from {
+        transform: translateY(12px) scale(0.97);
+        opacity: 0;
+    }
+
+    to {
+        transform: translateY(0) scale(1);
+        opacity: 1;
+    }
+}
+
+.modal-titulo {
+    margin: 0 0 8px;
+    font-size: 24px;
+    color: var(--brand-600);
+    font-weight: 800;
+}
+
+.modal-texto {
+    margin: 0 0 18px;
+    font-size: 14px;
+    color: var(--slate-500);
+}
+
+.modal-datos {
+    display: flex;
+    justify-content: center;
+    gap: 40px;
+    margin-bottom: 22px;
+}
+
+.modal-datos>div {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.boton-principal {
+    width: 100%;
+    border: none;
+    border-radius: 12px;
+    background: var(--brand-600);
+    color: #fff;
+    font-size: 15px;
+    font-weight: 700;
+    padding: 13px;
+    cursor: pointer;
+    box-shadow: 0 10px 20px -8px rgba(29, 63, 184, 0.5);
+    transition: background 0.15s;
+}
+
+.boton-principal:hover {
+    background: var(--brand-500);
+}

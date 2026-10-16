@@ -1,0 +1,71 @@
+/* ============================================================
+   SUDOKU — Estilos globales
+   Variables de diseño, reset y tipografía base.
+   ============================================================ */
+
+:root {
+    --brand-50: #eef4ff;
+    --brand-100: #e0ebff;
+    --brand-200: #c7d7fe;
+    --brand-500: #3563e9;
+    --brand-600: #254edb;
+    --brand-700: #1d3fb8;
+    --brand-900: #152c78;
+
+    --slate-50: #f8fafc;
+    --slate-100: #f1f5f9;
+    --slate-200: #e2e8f0;
+    --slate-300: #cbd5e1;
+    --slate-400: #94a3b8;
+    --slate-500: #64748b;
+    --slate-600: #475569;
+    --slate-700: #334155;
+    --slate-800: #1e293b;
+    --slate-900: #0f172a;
+
+    --fondo: var(--slate-50);
+    --borde: var(--slate-200);
+    --error: #dc2626;
+    --error-fondo: #fee2e2;
+    --input: #2563eb;
+
+    --sombra-soft: 0 4px 20px -2px rgba(27, 46, 94, 0.06),
+        0 2px 6px -1px rgba(27, 46, 94, 0.04);
+    --sombra-elevada: 0 12px 30px -4px rgba(37, 78, 219, 0.12),
+        0 4px 12px -2px rgba(0, 0, 0, 0.05);
+
+    --celda: 52px;
+}
+
+* {
+    box-sizing: border-box;
+    -webkit-tap-highlight-color: transparent;
+}
+
+body {
+    margin: 0;
+    min-height: 100vh;
+    background: var(--fondo);
+    color: var(--slate-800);
+    font-family: "Plus Jakarta Sans", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    -webkit-font-smoothing: antialiased;
+}
+
+button {
+    font-family: inherit;
+}
+
+.icono {
+    width: 16px;
+    height: 16px;
+}
+
+.oculto {
+    display: none !important;
+}
+
+@media (max-width: 520px) {
+    :root {
+        --celda: min(9.6vw, 46px);
+    }
+}

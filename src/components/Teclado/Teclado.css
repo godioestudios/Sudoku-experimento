@@ -1,0 +1,69 @@
+/* ============================================================
+   TECLADO NUMÉRICO
+   ============================================================ */
+
+.teclado {
+    display: grid;
+    grid-template-columns: repeat(9, 1fr);
+    gap: 6px;
+    margin-top: 14px;
+}
+
+.tecla {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid var(--borde);
+    border-radius: 12px;
+    background: #ffffff;
+    color: var(--brand-600);
+    font-size: 20px;
+    font-weight: 700;
+    padding: 8px 0 18px;
+    cursor: pointer;
+    box-shadow: 0 1px 2px rgba(15, 23, 42, 0.05);
+    transition: background 0.15s, border-color 0.15s, transform 0.08s;
+}
+
+.tecla:hover {
+    border-color: var(--brand-500);
+    background: rgba(239, 246, 255, 0.5);
+}
+
+.tecla:active {
+    transform: scale(0.95);
+}
+
+.tecla-numero {
+    transition: transform 0.15s;
+}
+
+.tecla:hover .tecla-numero {
+    transform: scale(1.1);
+}
+
+/* Número pequeño con las veces que aún falta colocar ese dígito */
+.tecla-restante {
+    position: absolute;
+    bottom: 4px;
+    left: 0;
+    right: 0;
+    text-align: center;
+    font-size: 10px;
+    font-weight: 600;
+    color: var(--slate-400);
+}
+
+/* Cuando ya se colocaron las 9 veces: se apaga */
+.tecla.completa {
+    opacity: 0.4;
+}
+
+@media (max-width: 520px) {
+    .tecla {
+        font-size: 18px;
+        padding: 6px 0 16px;
+    }
+}

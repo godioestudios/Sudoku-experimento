@@ -1,0 +1,81 @@
+/* ============================================================
+   BARRA DE ACCIONES
+   ============================================================ */
+
+.acciones {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 8px;
+    margin-top: 16px;
+}
+
+.accion {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    border: 1px solid var(--borde);
+    border-radius: 12px;
+    background: #ffffff;
+    color: var(--slate-700);
+    font-size: 11px;
+    font-weight: 600;
+    padding: 10px 4px;
+    cursor: pointer;
+    box-shadow: 0 1px 2px rgba(15, 23, 42, 0.05);
+    transition: background 0.15s, border-color 0.15s, color 0.15s, transform 0.08s;
+}
+
+.accion:hover:not(:disabled) {
+    background: var(--slate-50);
+    border-color: var(--slate-300);
+}
+
+.accion:active:not(:disabled) {
+    transform: scale(0.95);
+}
+
+.accion:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+}
+
+.accion-icono {
+    width: 20px;
+    height: 20px;
+    color: var(--slate-600);
+}
+
+.accion-icono-pista {
+    color: #f59e0b;
+}
+
+/* Botón de apuntes activado */
+.accion.activa {
+    border-color: var(--brand-500);
+    background: rgba(239, 246, 255, 0.6);
+}
+
+/* Botón "Nuevo" (destacado) */
+.accion-nueva {
+    border-color: transparent;
+    background: var(--brand-600);
+    color: #fff;
+    box-shadow: 0 6px 14px -4px rgba(53, 99, 233, 0.5);
+}
+
+.accion-nueva .accion-icono {
+    color: #fff;
+}
+
+.accion-nueva:hover:not(:disabled) {
+    background: var(--brand-700);
+    border-color: transparent;
+}
+
+@media (max-width: 520px) {
+    .accion-texto {
+        font-size: 10px;
+    }
+}

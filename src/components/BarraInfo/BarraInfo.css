@@ -1,0 +1,116 @@
+/* ============================================================
+   BARRA DE INFORMACIÓN
+   ============================================================ */
+
+.barra-info {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    align-items: center;
+    width: 100%;
+    background: #ffffff;
+    border: 1px solid var(--borde);
+    border-radius: 16px;
+    box-shadow: var(--sombra-soft);
+    padding: 12px 20px;
+    margin-bottom: 14px;
+}
+
+.info-bloque {
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+}
+
+.info-bloque-centro {
+    align-items: center;
+    border-left: 1px solid var(--slate-100);
+    border-right: 1px solid var(--slate-100);
+    padding: 0 8px;
+}
+
+.info-bloque-derecha {
+    flex-direction: row;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 10px;
+}
+
+.info-tiempo-grupo {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 1px;
+}
+
+.info-etiqueta {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--slate-400);
+    font-weight: 700;
+}
+
+.info-valor {
+    font-size: 16px;
+    font-weight: 700;
+    color: var(--slate-800);
+    display: inline-flex;
+    align-items: baseline;
+    gap: 1px;
+}
+
+.info-valor-mono {
+    font-family: "JetBrains Mono", ui-monospace, monospace;
+    font-variant-numeric: tabular-nums;
+}
+
+.info-max {
+    color: var(--slate-400);
+    font-weight: 500;
+}
+
+/* ---------- Botón de pausa ---------- */
+
+.btn-pausa {
+    width: 34px;
+    height: 34px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid var(--slate-200);
+    border-radius: 10px;
+    background: var(--slate-100);
+    color: var(--slate-600);
+    cursor: pointer;
+    transition: background 0.15s, color 0.15s, transform 0.08s;
+}
+
+.btn-pausa .icono {
+    width: 16px;
+    height: 16px;
+}
+
+.btn-pausa:hover:not(:disabled) {
+    background: var(--brand-50);
+    color: var(--brand-600);
+}
+
+.btn-pausa:active:not(:disabled) {
+    transform: scale(0.95);
+}
+
+.btn-pausa:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+}
+
+.btn-pausa.en-pausa {
+    background: var(--brand-100);
+    color: var(--brand-600);
+}
+
+@media (max-width: 520px) {
+    .barra-info {
+        padding: 10px 14px;
+    }
+}

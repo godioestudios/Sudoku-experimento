@@ -1,0 +1,370 @@
+import { useCallback, useEffect, useMemo, useState } from "react";
+import {
+  DIFICULTADES,
+  TAMAÑO,
+  copiarNotas,
+  copiarTablero,
+  crearNotasVacias,
+  crearPuzzle,
+  generarTableroResuelto,
+} from "../utils/sudoku.js";
+
+const HISTORIAL_MAX = 200;
+
+/** Genera una partida completa (solución, puzzle, celdas fijas y apuntes). */
+function prepararPartida(nivel) {
+  const tableroSolucion = generarTableroResuelto();
+  const puzzle = crearPuzzle(tableroSolucion, DIFICULTADES[nivel]);
+  return {
+    tableroSolucion,
+    tableroJuego: copiarTablero(puzzle),
+    celdasFijas: puzzle.map((fila) => fila.map((valor) => valor !== 0)),
+    notas: crearNotasVacias(),
+  };
+}
+
+/**
+ * Concentra todo el estado y la lógica de una partida de Sudoku.
+ */
+export function useSudoku() {
+  const [dificultad, setDificultad] = useState("medio");
+  const [partida, setPartida] = useState(() => prepararPartida("medio"));
+  const [seleccion, setSeleccion] = useState(null);
+  const [historial, setHistorial] = useState([]);
+  const [modoNotas, setModoNotas] = useState(false);
+  const [errores, setErrores] = useState(0);
+  const [segundos, setSegundos] = useState(0);
+  const [pausado, setPausado] = useState(false);
+  const [activa, setActiva] = useState(true);
+  const [generando, setGenerando] = useState(false);
+  const [estado, setEstado] = useState("Selecciona una casilla y coloca un número.");
+
+  const { tableroSolucion, tableroJuego, celdasFijas, notas } = partida;
+
+  // ----------------------------------------------------------
+  // VICTORIA (derivada del tablero, sin efectos)
+  // ----------------------------------------------------------
+  const victoria = useMemo(() => {
+    for (let fila = 0; fila < TAMAÑO; fila++) {
+      for (let columna = 0; columna < TAMAÑO; columna++) {
+        if (tableroJuego[fila][columna] !== tableroSolucion[fila][columna]) return false;
+      }
+    }
+    return true;
+  }, [tableroJuego, tableroSolucion]);
+
+  const bloqueado = pausado || victoria || generando;
+
+  // ----------------------------------------------------------
+  // CRONÓMETRO
+  // ----------------------------------------------------------
+  useEffect(() => {
+    if (!activa || bloqueado) return;
+    const id = setInterval(() => setSegundos((s) => s + 1), 1000);
+    return () => clearInterval(id);
+  }, [activa, bloqueado]);
+
+  // ----------------------------------------------------------
+  // HISTORIAL
+  // ----------------------------------------------------------
+  const guardarHistorial = useCallback(() => {
+    setHistorial((previo) => {
+      const siguiente = [
+        ...previo,
+        { tablero: copiarTablero(tableroJuego), notas: copiarNotas(notas), errores },
+      ];
+      if (siguiente.length > HISTORIAL_MAX) siguiente.shift();
+      return siguiente;
+    });
+  }, [tableroJuego, notas, errores]);
+
+  // ----------------------------------------------------------
+  // NUEVA PARTIDA
+  // ----------------------------------------------------------
+  const nuevoJuego = useCallback(
+    (nivel = dificultad) => {
+      setGenerando(true);
+      setPausado(false);
+      setSegundos(0);
+      setEstado("Generando puzzle...");
+      setActiva(false);
+
+      // Retardo mínimo para que el navegador pinte el mensaje antes de calcular
+      setTimeout(() => {
+        setPartida(prepararPartida(nivel));
+        setHistorial([]);
+        setSeleccion(null);
+        setErrores(0);
+        setModoNotas(false);
+        setGenerando(false);
+        setEstado("Selecciona una casilla y coloca un número.");
+        setActiva(true);
+      }, 40);
+    },
+    [dificultad]
+  );
+
+  // ----------------------------------------------------------
+  // ACCIONES DEL JUGADOR
+  // ----------------------------------------------------------
+  const seleccionarCelda = useCallback(
+    (fila, columna) => {
+      if (bloqueado) return;
+      setSeleccion((previa) => {
+        if (previa && previa.fila === fila && previa.columna === columna) return null;
+        return { fila, columna };
+      });
+    },
+    [bloqueado]
+  );
+
+  const colocarNumero = useCallback(
+    (numero) => {
+      if (bloqueado || !seleccion) return;
+
+      const { fila, columna } = seleccion;
+      if (celdasFijas[fila][columna]) return; // Las casillas iniciales no se tocan
+
+      guardarHistorial();
+
+      if (modoNotas) {
+        // En modo apuntes solo trabajamos sobre casillas vacías
+        if (tableroJuego[fila][columna] !== 0) {
+          setHistorial((previo) => previo.slice(0, -1)); // No hubo cambio real
+          return;
+        }
+
+        setPartida((previo) => {
+          const nuevasNotas = copiarNotas(previo.notas);
+          const candidatos = nuevasNotas[fila][columna];
+          if (candidatos.has(numero)) candidatos.delete(numero);
+          else candidatos.add(numero);
+          return { ...previo, notas: nuevasNotas };
+        });
+      } else {
+        setPartida((previo) => {
+          const nuevoTablero = copiarTablero(previo.tableroJuego);
+          nuevoTablero[fila][columna] = numero;
+          const nuevasNotas = copiarNotas(previo.notas);
+          nuevasNotas[fila][columna].clear();
+          return { ...previo, tableroJuego: nuevoTablero, notas: nuevasNotas };
+        });
+
+        // Contamos un error si el número no coincide con la solución
+        if (numero !== 0 && numero !== tableroSolucion[fila][columna]) {
+          setErrores((e) => e + 1);
+        }
+      }
+    },
+    [bloqueado, seleccion, celdasFijas, guardarHistorial, modoNotas, tableroJuego, tableroSolucion]
+  );
+
+  const borrarCelda = useCallback(() => {
+    if (bloqueado || !seleccion) return;
+
+    const { fila, columna } = seleccion;
+    if (celdasFijas[fila][columna]) return;
+    if (tableroJuego[fila][columna] === 0 && notas[fila][columna].size === 0) return;
+
+    guardarHistorial();
+    setPartida((previo) => {
+      const nuevoTablero = copiarTablero(previo.tableroJuego);
+      nuevoTablero[fila][columna] = 0;
+      const nuevasNotas = copiarNotas(previo.notas);
+      nuevasNotas[fila][columna].clear();
+      return { ...previo, tableroJuego: nuevoTablero, notas: nuevasNotas };
+    });
+  }, [bloqueado, seleccion, celdasFijas, tableroJuego, notas, guardarHistorial]);
+
+  const darPista = useCallback(() => {
+    if (bloqueado) return;
+
+    let destino = seleccion;
+
+    // Si la casilla seleccionada ya está resuelta, buscamos otra
+    if (
+      destino &&
+      tableroJuego[destino.fila][destino.columna] === tableroSolucion[destino.fila][destino.columna]
+    ) {
+      destino = null;
+    }
+
+    // Si no hay destino válido, elegimos una casilla vacía al azar
+    if (!destino) {
+      const vacias = [];
+      for (let f = 0; f < TAMAÑO; f++) {
+        for (let c = 0; c < TAMAÑO; c++) {
+          if (tableroJuego[f][c] === 0) vacias.push([f, c]);
+        }
+      }
+      if (vacias.length === 0) return;
+      const [f, c] = vacias[Math.floor(Math.random() * vacias.length)];
+      destino = { fila: f, columna: c };
+    }
+
+    const { fila, columna } = destino;
+    guardarHistorial();
+    setSeleccion(destino);
+    setPartida((previo) => {
+      const nuevoTablero = copiarTablero(previo.tableroJuego);
+      nuevoTablero[fila][columna] = tableroSolucion[fila][columna];
+      const nuevasNotas = copiarNotas(previo.notas);
+      nuevasNotas[fila][columna].clear();
+      return { ...previo, tableroJuego: nuevoTablero, notas: nuevasNotas };
+    });
+  }, [bloqueado, seleccion, tableroJuego, tableroSolucion, guardarHistorial]);
+
+  const deshacer = useCallback(() => {
+    if (bloqueado || historial.length === 0) return;
+
+    const estadoPrevio = historial[historial.length - 1];
+    setPartida((previo) => ({
+      ...previo,
+      tableroJuego: estadoPrevio.tablero,
+      notas: estadoPrevio.notas,
+    }));
+    setErrores(estadoPrevio.errores);
+    setHistorial((previo) => previo.slice(0, -1));
+  }, [bloqueado, historial]);
+
+  const alternarNotas = useCallback(() => {
+    setModoNotas((previo) => {
+      const siguiente = !previo;
+      setEstado(
+        siguiente
+          ? "Modo apuntes activado: los números se añaden como candidatos."
+          : "Modo apuntes desactivado."
+      );
+      return siguiente;
+    });
+  }, []);
+
+  // ----------------------------------------------------------
+  // PAUSA
+  // ----------------------------------------------------------
+  const reanudar = useCallback(() => setPausado(false), []);
+  const pausar = useCallback(() => setPausado(true), []);
+  const alternarPausa = useCallback(() => setPausado((previo) => !previo), []);
+
+  // ----------------------------------------------------------
+  // DIFICULTAD
+  // ----------------------------------------------------------
+  const cambiarDificultad = useCallback(
+    (nivel) => {
+      setDificultad(nivel);
+      nuevoJuego(nivel);
+    },
+    [nuevoJuego]
+  );
+
+  // ----------------------------------------------------------
+  // TECLADO FÍSICO
+  // ----------------------------------------------------------
+  useEffect(() => {
+    function manejarTeclado(evento) {
+      if (!activa) return;
+
+      // Con la partida en pausa, la tecla P reanuda y nada más se procesa
+      if (pausado) {
+        if (evento.key.toLowerCase() === "p") reanudar();
+        return;
+      }
+      if (victoria) return;
+
+      if (evento.key.toLowerCase() === "p") {
+        pausar();
+        return;
+      }
+
+      // Flechas: mover la selección
+      if (evento.key.startsWith("Arrow")) {
+        evento.preventDefault();
+        const actual = seleccion ?? { fila: 0, columna: 0 };
+        const { fila, columna } = actual;
+        if (evento.key === "ArrowUp") setSeleccion({ fila: Math.max(0, fila - 1), columna });
+        if (evento.key === "ArrowDown") setSeleccion({ fila: Math.min(8, fila + 1), columna });
+        if (evento.key === "ArrowLeft") setSeleccion({ fila, columna: Math.max(0, columna - 1) });
+        if (evento.key === "ArrowRight") setSeleccion({ fila, columna: Math.min(8, columna + 1) });
+        return;
+      }
+
+      if (/^[1-9]$/.test(evento.key)) return colocarNumero(Number(evento.key));
+
+      if (evento.key === "Backspace" || evento.key === "Delete") {
+        evento.preventDefault();
+        return borrarCelda();
+      }
+
+      if (evento.key === "Escape") {
+        setSeleccion(null);
+        return;
+      }
+
+      // Atajos: N apuntes, H pista, Z deshacer
+      if (evento.key.toLowerCase() === "n") alternarNotas();
+      if (evento.key.toLowerCase() === "h") darPista();
+      if (evento.key.toLowerCase() === "z") deshacer();
+    }
+
+    document.addEventListener("keydown", manejarTeclado);
+    return () => document.removeEventListener("keydown", manejarTeclado);
+  }, [
+    activa,
+    pausado,
+    victoria,
+    seleccion,
+    reanudar,
+    pausar,
+    colocarNumero,
+    borrarCelda,
+    darPista,
+    deshacer,
+    alternarNotas,
+  ]);
+
+  // ----------------------------------------------------------
+  // CONTADORES DEL TECLADO
+  // ----------------------------------------------------------
+  const conteoDigitos = useMemo(() => {
+    const conteo = Array(10).fill(0);
+    for (let fila = 0; fila < TAMAÑO; fila++) {
+      for (let columna = 0; columna < TAMAÑO; columna++) {
+        const valor = tableroJuego[fila][columna];
+        if (valor !== 0) conteo[valor]++;
+      }
+    }
+    return conteo;
+  }, [tableroJuego]);
+
+  return {
+    // Datos
+    dificultad,
+    tableroSolucion,
+    tableroJuego,
+    celdasFijas,
+    notas,
+    seleccion,
+    modoNotas,
+    errores,
+    segundos,
+    pausado,
+    generando,
+    victoria,
+    estado: victoria ? "¡Sudoku completado!" : estado,
+    conteoDigitos,
+    deshacerDisponible: historial.length > 0,
+    listo: tableroJuego !== null,
+    // Acciones
+    seleccionarCelda,
+    colocarNumero,
+    borrarCelda,
+    darPista,
+    deshacer,
+    alternarNotas,
+    pausar,
+    reanudar,
+    alternarPausa,
+    cambiarDificultad,
+    nuevoJuego,
+  };
+}
