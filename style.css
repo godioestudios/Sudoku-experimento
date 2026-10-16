@@ -1,40 +1,68 @@
 /* ============================================================
    SUDOKU — Hoja de estilos
-   Paleta inspirada en el look clásico de los juegos de sudoku:
-   azul principal, grises suaves y esquinas redondeadas.
+   Estilo moderno y elegante: tipografía Plus Jakarta Sans,
+   paleta azul "brand", tarjetas suaves y bordes definidos.
    ============================================================ */
 
 :root {
-  --azul: #325aaf;          /* Azul principal (botones, acentos) */
-  --azul-oscuro: #344861;   /* Líneas gruesas del tablero y texto */
-  --azul-claro: #5a7bc0;    /* Variante clara del azul */
-  --gris-texto: #6e7c8c;    /* Texto secundario */
-  --gris-suave: #94a3b7;    /* Etiquetas y números apagados */
-  --fondo: #f3f6fa;         /* Fondo de la página */
-  --borde: #d2dae7;         /* Bordes finos */
-  --borde-suave: #eaeef4;   /* Bordes muy suaves del tablero */
-  --error: #ff3b30;         /* Rojo para errores */
-  --resaltado-area: #e9eef8;/* Fila/columna/caja seleccionadas */
-  --resaltado-igual: #c7d7f3;/* Mismo número */
-  --seleccion: #b9cff2;     /* Casilla seleccionada */
-  --celda: 52px;            /* Tamaño de cada casilla */
+    --brand-50: #eef4ff;
+    --brand-100: #e0ebff;
+    --brand-200: #c7d7fe;
+    --brand-500: #3563e9;
+    --brand-600: #254edb;
+    --brand-700: #1d3fb8;
+    --brand-900: #152c78;
+
+    --slate-50: #f8fafc;
+    --slate-100: #f1f5f9;
+    --slate-200: #e2e8f0;
+    --slate-300: #cbd5e1;
+    --slate-400: #94a3b8;
+    --slate-500: #64748b;
+    --slate-600: #475569;
+    --slate-700: #334155;
+    --slate-800: #1e293b;
+    --slate-900: #0f172a;
+
+    --fondo: var(--slate-50);
+    --borde: var(--slate-200);
+    --error: #dc2626;
+    --error-fondo: #fee2e2;
+    --input: #2563eb;
+
+    --sombra-soft: 0 4px 20px -2px rgba(27, 46, 94, 0.06),
+        0 2px 6px -1px rgba(27, 46, 94, 0.04);
+    --sombra-elevada: 0 12px 30px -4px rgba(37, 78, 219, 0.12),
+        0 4px 12px -2px rgba(0, 0, 0, 0.05);
+
+    --celda: 52px;
 }
 
 * {
-  box-sizing: border-box;
-  -webkit-tap-highlight-color: transparent;
+    box-sizing: border-box;
+    -webkit-tap-highlight-color: transparent;
 }
 
 body {
-  margin: 0;
-  background: var(--fondo);
-  color: var(--azul-oscuro);
-  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
-  -webkit-font-smoothing: antialiased;
+    margin: 0;
+    min-height: 100vh;
+    background: var(--fondo);
+    color: var(--slate-800);
+    font-family: "Plus Jakarta Sans", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    -webkit-font-smoothing: antialiased;
 }
 
 button {
-  font-family: inherit;
+    font-family: inherit;
+}
+
+.icono {
+    width: 16px;
+    height: 16px;
+}
+
+.oculto {
+    display: none !important;
 }
 
 /* ============================================================
@@ -42,76 +70,98 @@ button {
    ============================================================ */
 
 .cabecera {
-  background: #ffffff;
-  border-bottom: 1px solid var(--borde);
-  position: sticky;
-  top: 0;
-  z-index: 20;
+    background: #ffffff;
+    border-bottom: 1px solid var(--borde);
+    position: sticky;
+    top: 0;
+    z-index: 20;
 }
 
 .cabecera-contenido {
-  max-width: 620px;
-  margin: 0 auto;
-  padding: 10px 16px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
+    max-width: 900px;
+    margin: 0 auto;
+    padding: 14px 16px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: space-between;
+    gap: 14px;
 }
 
 .logo {
-  display: flex;
-  align-items: center;
-  gap: 9px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
 }
 
 .logo-icono {
-  width: 32px;
-  height: 32px;
-  display: grid;
-  place-items: center;
-  background: var(--azul);
-  color: #fff;
-  font-weight: 800;
-  font-size: 18px;
-  border-radius: 8px;
+    width: 40px;
+    height: 40px;
+    display: grid;
+    place-items: center;
+    background: linear-gradient(to top right, var(--brand-700), var(--brand-600), #60a5fa);
+    color: #fff;
+    font-weight: 800;
+    font-size: 20px;
+    border-radius: 12px;
+    box-shadow: 0 6px 14px -4px rgba(53, 99, 233, 0.5);
 }
 
 .logo-texto {
-  font-size: 21px;
-  font-weight: 700;
-  color: var(--azul);
-  letter-spacing: 0.3px;
+    font-size: 22px;
+    font-weight: 800;
+    color: var(--slate-900);
+    letter-spacing: -0.02em;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.logo-badge {
+    font-size: 12px;
+    font-weight: 600;
+    padding: 2px 8px;
+    background: rgba(224, 235, 255, 0.7);
+    color: var(--brand-700);
+    border-radius: 999px;
 }
 
 /* Pestañas de dificultad */
 .dificultades {
-  display: flex;
-  gap: 4px;
-  background: var(--fondo);
-  border-radius: 8px;
-  padding: 4px;
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    background: rgba(226, 232, 240, 0.7);
+    border-radius: 12px;
+    padding: 4px;
 }
 
 .dificultades button {
-  border: none;
-  background: transparent;
-  color: var(--gris-texto);
-  font-size: 13px;
-  font-weight: 600;
-  padding: 7px 13px;
-  border-radius: 6px;
-  cursor: pointer;
-  transition: background 0.15s, color 0.15s;
+    border: none;
+    background: transparent;
+    color: var(--slate-600);
+    font-size: 13px;
+    font-weight: 600;
+    padding: 6px 14px;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: background 0.15s, color 0.15s, box-shadow 0.15s;
 }
 
 .dificultades button:hover {
-  color: var(--azul);
+    color: var(--slate-900);
 }
 
 .dificultades button.activo {
-  background: var(--azul);
-  color: #fff;
+    background: #ffffff;
+    color: var(--brand-700);
+    box-shadow: 0 1px 2px rgba(15, 23, 42, 0.1);
+}
+
+@media (min-width: 560px) {
+    .cabecera-contenido {
+        flex-direction: row;
+    }
 }
 
 /* ============================================================
@@ -119,164 +169,329 @@ button {
    ============================================================ */
 
 .juego {
-  max-width: 620px;
-  margin: 0 auto;
-  padding: 18px 16px 40px;
+    max-width: 500px;
+    margin: 0 auto;
+    padding: 20px 16px 40px;
 }
 
 /* ---------- Barra de información ---------- */
 
 .barra-info {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 14px;
-  padding: 0 4px;
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    align-items: center;
+    width: 100%;
+    background: #ffffff;
+    border: 1px solid var(--borde);
+    border-radius: 16px;
+    box-shadow: var(--sombra-soft);
+    padding: 12px 20px;
+    margin-bottom: 14px;
 }
 
 .info-bloque {
-  display: flex;
-  flex-direction: column;
-  gap: 1px;
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
 }
 
-.info-bloque:last-child {
-  text-align: right;
+.info-bloque-centro {
+    align-items: center;
+    border-left: 1px solid var(--slate-100);
+    border-right: 1px solid var(--slate-100);
+    padding: 0 8px;
+}
+
+.info-bloque-derecha {
+    flex-direction: row;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 10px;
+}
+
+.info-tiempo-grupo {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 1px;
 }
 
 .info-etiqueta {
-  font-size: 11px;
-  text-transform: uppercase;
-  letter-spacing: 0.6px;
-  color: var(--gris-suave);
-  font-weight: 600;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--slate-400);
+    font-weight: 700;
 }
 
 .info-valor {
-  font-size: 16px;
-  font-weight: 700;
-  color: var(--azul-oscuro);
+    font-size: 16px;
+    font-weight: 700;
+    color: var(--slate-800);
+    display: inline-flex;
+    align-items: baseline;
+    gap: 1px;
+}
+
+.info-valor-mono {
+    font-family: "JetBrains Mono", ui-monospace, monospace;
+    font-variant-numeric: tabular-nums;
+}
+
+.info-max {
+    color: var(--slate-400);
+    font-weight: 500;
+}
+
+/* ---------- Botón de pausa ---------- */
+
+.btn-pausa {
+    width: 34px;
+    height: 34px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid var(--slate-200);
+    border-radius: 10px;
+    background: var(--slate-100);
+    color: var(--slate-600);
+    cursor: pointer;
+    transition: background 0.15s, color 0.15s, transform 0.08s;
+}
+
+.btn-pausa .icono {
+    width: 16px;
+    height: 16px;
+}
+
+.btn-pausa:hover:not(:disabled) {
+    background: var(--brand-50);
+    color: var(--brand-600);
+}
+
+.btn-pausa:active:not(:disabled) {
+    transform: scale(0.95);
+}
+
+.btn-pausa:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+}
+
+.btn-pausa.en-pausa {
+    background: var(--brand-100);
+    color: var(--brand-600);
 }
 
 /* ---------- Tablero ---------- */
 
 .tablero-envoltorio {
-  background: var(--azul-oscuro);
-  padding: 2px;
-  border-radius: 6px;
-  box-shadow: 0 4px 14px rgba(52, 72, 97, 0.18);
-  width: max-content;
-  margin: 0 auto;
+    position: relative;
+    width: max-content;
+    margin: 0 auto;
+    background: #ffffff;
+    border: 3px solid var(--slate-800);
+    border-radius: 16px;
+    box-shadow: var(--sombra-elevada);
+    padding: 2px;
+    overflow: hidden;
 }
 
 .tablero {
-  display: grid;
-  grid-template-columns: repeat(9, var(--celda));
-  grid-template-rows: repeat(9, var(--celda));
-  background: var(--azul-oscuro);
-  gap: 1px; /* Línea gruesa entre cajas 3x3 */
-  overflow: hidden;
-  border-radius: 4px;
+    display: grid;
+    grid-template-columns: repeat(9, var(--celda));
+    grid-template-rows: repeat(9, var(--celda));
+    background: #ffffff;
+    overflow: hidden;
+    border-radius: 12px;
 }
 
 /* Cada casilla */
 .celda {
-  width: var(--celda);
-  height: var(--celda);
-  border: none;
-  outline: none;
-  padding: 0;
-  margin: 0;
-  background: #ffffff;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: calc(var(--celda) * 0.5);
-  font-weight: 500;
-  color: var(--azul-oscuro);
-  position: relative;
-  transition: background 0.1s;
+    width: var(--celda);
+    height: var(--celda);
+    border: none;
+    outline: none;
+    padding: 0;
+    margin: 0;
+    background: #ffffff;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: calc(var(--celda) * 0.5);
+    font-weight: 500;
+    color: var(--slate-900);
+    position: relative;
+    transition: background 0.12s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 /* Números fijos (los que vienen con el puzzle) */
 .celda.fija {
-  color: var(--azul-oscuro);
-  font-weight: 700;
-  cursor: default;
+    color: var(--slate-900);
+    font-weight: 700;
+    cursor: default;
 }
 
 /* Números que coloca el jugador */
 .celda.jugador {
-  color: var(--azul);
-  font-weight: 600;
+    color: var(--input);
+    font-weight: 600;
 }
 
 /* --- Resaltados --- */
 
-/* Misma fila, columna y caja 3x3 */
 .celda.en-area {
-  background: var(--resaltado-area);
+    background: var(--slate-100);
 }
 
-/* Celdas con el mismo número que la seleccionada */
 .celda.mismo-numero {
-  background: var(--resaltado-igual);
+    background: #e0e7ff;
+    color: #1e3a8a;
+    font-weight: 700;
 }
 
-/* Casilla seleccionada (va encima de los anteriores) */
 .celda.seleccionada {
-  background: var(--seleccion);
-  box-shadow: inset 0 0 0 2px var(--azul);
+    background: #c7d2fe;
+    box-shadow: inset 0 0 0 2px #3b82f6;
+    color: #1e3a8a;
 }
 
 /* Número incorrecto (no coincide con la solución) — el último, gana siempre */
 .celda.error {
-  background: #ffe0dd;
-  color: var(--error);
+    background: var(--error-fondo);
+    color: var(--error);
 }
 
 /* Cuadrícula fina: líneas suaves entre celdas, gruesas cada 3 */
 .celda::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  border-right: 1px solid var(--borde-suave);
-  border-bottom: 1px solid var(--borde-suave);
+    content: "";
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    border-right: 1px solid var(--slate-200);
+    border-bottom: 1px solid var(--slate-200);
 }
 
 .celda.borde-derecha::after {
-  border-right: 2px solid var(--azul-oscuro);
+    border-right: 2.5px solid var(--slate-700);
 }
 
 .celda.borde-abajo::after {
-  border-bottom: 2px solid var(--azul-oscuro);
+    border-bottom: 2.5px solid var(--slate-700);
+}
+
+/* ---------- Capa de pausa sobre el tablero ---------- */
+
+.overlay-pausa {
+    position: absolute;
+    inset: 0;
+    z-index: 30;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    padding: 24px;
+    text-align: center;
+    color: #fff;
+    background: rgba(15, 23, 42, 0.6);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    transition: opacity 0.2s;
+}
+
+.overlay-icono {
+    width: 72px;
+    height: 72px;
+    display: grid;
+    place-items: center;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    margin-bottom: 10px;
+    animation: pulso 2.4s infinite ease-in-out;
+}
+
+.overlay-icono svg {
+    width: 38px;
+    height: 38px;
+}
+
+@keyframes pulso {
+
+    0%,
+    100% {
+        transform: scale(1);
+        opacity: 1;
+    }
+
+    50% {
+        transform: scale(1.04);
+        opacity: 0.9;
+    }
+}
+
+.overlay-titulo {
+    margin: 0;
+    font-size: 22px;
+    font-weight: 800;
+    letter-spacing: -0.01em;
+}
+
+.overlay-texto {
+    margin: 0 0 18px;
+    font-size: 13px;
+    color: var(--slate-200);
+}
+
+.btn-reanudar {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    border: none;
+    border-radius: 12px;
+    background: var(--brand-600);
+    color: #fff;
+    font-size: 14px;
+    font-weight: 600;
+    padding: 10px 24px;
+    cursor: pointer;
+    box-shadow: 0 10px 20px -6px rgba(29, 63, 184, 0.5);
+    transition: background 0.15s, transform 0.08s;
+}
+
+.btn-reanudar:hover {
+    background: var(--brand-500);
+}
+
+.btn-reanudar:active {
+    transform: scale(0.95);
 }
 
 /* ---------- Apuntes (notas/candidatos) ---------- */
 
 .notas {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  grid-template-rows: repeat(3, 1fr);
-  width: 100%;
-  height: 100%;
-  padding: 2px;
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    grid-template-rows: repeat(3, 1fr);
+    width: 100%;
+    height: 100%;
+    padding: 2px;
 }
 
 .notas span {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: calc(var(--celda) * 0.26);
-  font-weight: 600;
-  color: var(--gris-texto);
-  line-height: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: calc(var(--celda) * 0.26);
+    font-weight: 600;
+    color: var(--slate-600);
+    line-height: 1;
 }
 
 .notas span.oculto {
-  visibility: hidden;
+    visibility: hidden;
 }
 
 /* ============================================================
@@ -284,48 +499,62 @@ button {
    ============================================================ */
 
 .teclado {
-  display: grid;
-  grid-template-columns: repeat(9, 1fr);
-  gap: 6px;
-  margin-top: 18px;
+    display: grid;
+    grid-template-columns: repeat(9, 1fr);
+    gap: 6px;
+    margin-top: 14px;
 }
 
 .tecla {
-  position: relative;
-  border: none;
-  border-radius: 6px;
-  background: #ffffff;
-  color: var(--azul);
-  font-size: 24px;
-  font-weight: 600;
-  padding: 12px 0 20px;
-  cursor: pointer;
-  box-shadow: 0 1px 3px rgba(52, 72, 97, 0.14);
-  transition: background 0.12s, transform 0.08s;
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid var(--borde);
+    border-radius: 12px;
+    background: #ffffff;
+    color: var(--brand-600);
+    font-size: 20px;
+    font-weight: 700;
+    padding: 8px 0 18px;
+    cursor: pointer;
+    box-shadow: 0 1px 2px rgba(15, 23, 42, 0.05);
+    transition: background 0.15s, border-color 0.15s, transform 0.08s;
 }
 
 .tecla:hover {
-  background: #eef3fc;
+    border-color: var(--brand-500);
+    background: rgba(239, 246, 255, 0.5);
 }
 
 .tecla:active {
-  transform: translateY(1px);
+    transform: scale(0.95);
+}
+
+.tecla-numero {
+    transition: transform 0.15s;
+}
+
+.tecla:hover .tecla-numero {
+    transform: scale(1.1);
 }
 
 /* Número pequeño con las veces que aún falta colocar ese dígito */
 .tecla-restante {
-  position: absolute;
-  bottom: 4px;
-  left: 0;
-  right: 0;
-  font-size: 11px;
-  font-weight: 600;
-  color: var(--gris-suave);
+    position: absolute;
+    bottom: 4px;
+    left: 0;
+    right: 0;
+    text-align: center;
+    font-size: 10px;
+    font-weight: 600;
+    color: var(--slate-400);
 }
 
 /* Cuando ya se colocaron las 9 veces: se apaga */
 .tecla.completa {
-  opacity: 0.4;
+    opacity: 0.4;
 }
 
 /* ============================================================
@@ -333,79 +562,91 @@ button {
    ============================================================ */
 
 .acciones {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  margin-top: 16px;
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 8px;
+    margin-top: 16px;
 }
 
 .accion {
-  flex: 1;
-  min-width: 84px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 4px;
-  border: none;
-  border-radius: 8px;
-  background: #ffffff;
-  color: var(--gris-texto);
-  font-size: 12px;
-  font-weight: 600;
-  padding: 10px 6px;
-  cursor: pointer;
-  box-shadow: 0 1px 3px rgba(52, 72, 97, 0.12);
-  transition: background 0.12s, color 0.12s;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    border: 1px solid var(--borde);
+    border-radius: 12px;
+    background: #ffffff;
+    color: var(--slate-700);
+    font-size: 11px;
+    font-weight: 600;
+    padding: 10px 4px;
+    cursor: pointer;
+    box-shadow: 0 1px 2px rgba(15, 23, 42, 0.05);
+    transition: background 0.15s, border-color 0.15s, color 0.15s, transform 0.08s;
 }
 
 .accion:hover:not(:disabled) {
-  background: #eef3fc;
-  color: var(--azul);
+    background: var(--slate-50);
+    border-color: var(--slate-300);
+}
+
+.accion:active:not(:disabled) {
+    transform: scale(0.95);
 }
 
 .accion:disabled {
-  opacity: 0.45;
-  cursor: not-allowed;
+    opacity: 0.45;
+    cursor: not-allowed;
 }
 
 .accion-icono {
-  font-size: 18px;
-  line-height: 1;
+    width: 20px;
+    height: 20px;
+    color: var(--slate-600);
+}
+
+.accion-icono-pista {
+    color: #f59e0b;
 }
 
 /* Botón de apuntes activado */
 .accion.activa {
-  background: var(--azul);
-  color: #fff;
+    border-color: var(--brand-500);
+    background: rgba(239, 246, 255, 0.6);
 }
 
-/* Botón "Nuevo juego" (destacado) */
+/* Botón "Nuevo" (destacado) */
 .accion-nueva {
-  background: var(--azul);
-  color: #fff;
-  flex-direction: row;
-  justify-content: center;
-  align-items: center;
+    border-color: transparent;
+    background: var(--brand-600);
+    color: #fff;
+    box-shadow: 0 6px 14px -4px rgba(53, 99, 233, 0.5);
+}
+
+.accion-nueva .accion-icono {
+    color: #fff;
 }
 
 .accion-nueva:hover:not(:disabled) {
-  background: var(--azul-claro);
-  color: #fff;
+    background: var(--brand-700);
+    border-color: transparent;
 }
 
 /* ---------- Mensaje de estado ---------- */
 
 .estado {
-  min-height: 22px;
-  margin: 14px 0 0;
-  text-align: center;
-  font-size: 14px;
-  font-weight: 600;
-  color: var(--gris-texto);
+    min-height: 18px;
+    margin: 12px 0 0;
+    text-align: center;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--slate-500);
 }
 
 .estado.victoria {
-  color: var(--azul);
+    color: var(--brand-600);
+    font-weight: 700;
 }
 
 /* ============================================================
@@ -413,76 +654,87 @@ button {
    ============================================================ */
 
 .modal {
-  position: fixed;
-  inset: 0;
-  background: rgba(52, 72, 97, 0.55);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 20px;
-  z-index: 100;
+    position: fixed;
+    inset: 0;
+    background: rgba(15, 23, 42, 0.55);
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    z-index: 100;
 }
 
 .modal.oculto {
-  display: none;
+    display: none;
 }
 
 .modal-tarjeta {
-  background: #fff;
-  border-radius: 12px;
-  padding: 28px 26px;
-  width: 100%;
-  max-width: 340px;
-  text-align: center;
-  box-shadow: 0 12px 40px rgba(30, 50, 80, 0.35);
-  animation: aparecer 0.22s ease-out;
+    background: #fff;
+    border-radius: 20px;
+    padding: 28px 26px;
+    width: 100%;
+    max-width: 340px;
+    text-align: center;
+    box-shadow: 0 20px 50px -12px rgba(15, 23, 42, 0.4);
+    animation: aparecer 0.22s ease-out;
 }
 
 @keyframes aparecer {
-  from { transform: translateY(12px) scale(0.97); opacity: 0; }
-  to   { transform: translateY(0) scale(1); opacity: 1; }
+    from {
+        transform: translateY(12px) scale(0.97);
+        opacity: 0;
+    }
+
+    to {
+        transform: translateY(0) scale(1);
+        opacity: 1;
+    }
 }
 
 .modal-titulo {
-  margin: 0 0 8px;
-  font-size: 24px;
-  color: var(--azul);
+    margin: 0 0 8px;
+    font-size: 24px;
+    color: var(--brand-600);
+    font-weight: 800;
 }
 
 .modal-texto {
-  margin: 0 0 18px;
-  font-size: 14px;
-  color: var(--gris-texto);
+    margin: 0 0 18px;
+    font-size: 14px;
+    color: var(--slate-500);
 }
 
 .modal-datos {
-  display: flex;
-  justify-content: center;
-  gap: 40px;
-  margin-bottom: 22px;
+    display: flex;
+    justify-content: center;
+    gap: 40px;
+    margin-bottom: 22px;
 }
 
-.modal-datos > div {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
+.modal-datos>div {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
 }
 
 .boton-principal {
-  width: 100%;
-  border: none;
-  border-radius: 8px;
-  background: var(--azul);
-  color: #fff;
-  font-size: 15px;
-  font-weight: 700;
-  padding: 13px;
-  cursor: pointer;
-  transition: background 0.15s;
+    width: 100%;
+    border: none;
+    border-radius: 12px;
+    background: var(--brand-600);
+    color: #fff;
+    font-size: 15px;
+    font-weight: 700;
+    padding: 13px;
+    cursor: pointer;
+    box-shadow: 0 10px 20px -8px rgba(29, 63, 184, 0.5);
+    transition: background 0.15s;
 }
 
 .boton-principal:hover {
-  background: var(--azul-claro);
+    background: var(--brand-500);
 }
 
 /* ============================================================
@@ -490,25 +742,29 @@ button {
    ============================================================ */
 
 @media (max-width: 520px) {
-  :root {
-    --celda: min(9.6vw, 46px);
-  }
+    :root {
+        --celda: min(9.6vw, 46px);
+    }
 
-  .logo-texto {
-    font-size: 18px;
-  }
+    .logo-texto {
+        font-size: 20px;
+    }
 
-  .dificultades button {
-    padding: 6px 9px;
-    font-size: 12px;
-  }
+    .dificultades button {
+        padding: 6px 10px;
+        font-size: 12px;
+    }
 
-  .tecla {
-    font-size: 20px;
-    padding: 10px 0 18px;
-  }
+    .barra-info {
+        padding: 10px 14px;
+    }
 
-  .accion-texto {
-    font-size: 11px;
-  }
+    .tecla {
+        font-size: 18px;
+        padding: 6px 0 16px;
+    }
+
+    .accion-texto {
+        font-size: 10px;
+    }
 }

@@ -1,102 +1,162 @@
 <!DOCTYPE html>
 <html lang="es">
+
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Sudoku — Juega gratis</title>
-  <link rel="stylesheet" href="style.css">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sudoku — Juega gratis</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap"
+        rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
 </head>
+
 <body>
-  <!-- ============ CABECERA ============ -->
-  <header class="cabecera">
-    <div class="cabecera-contenido">
-      <div class="logo">
-        <span class="logo-icono">S</span>
-        <span class="logo-texto">Sudoku</span>
-      </div>
+    <!-- ============ CABECERA ============ -->
+    <header class="cabecera">
+        <div class="cabecera-contenido">
+            <div class="logo">
+                <span class="logo-icono">S</span>
+                <span class="logo-texto">Sudoku <span class="logo-badge">Pro</span></span>
+            </div>
 
-      <!-- Selector de dificultad (pestañas) -->
-      <nav class="dificultades" id="dificultades">
-        <button type="button" data-dificultad="facil">Fácil</button>
-        <button type="button" data-dificultad="medio" class="activo">Medio</button>
-        <button type="button" data-dificultad="dificil">Difícil</button>
-        <button type="button" data-dificultad="experto">Experto</button>
-      </nav>
-    </div>
-  </header>
-
-  <!-- ============ JUEGO ============ -->
-  <main class="juego">
-
-    <!-- Barra de información: dificultad, errores y tiempo -->
-    <div class="barra-info">
-      <div class="info-bloque">
-        <span class="info-etiqueta">Dificultad</span>
-        <span class="info-valor" id="info-dificultad">Medio</span>
-      </div>
-      <div class="info-bloque">
-        <span class="info-etiqueta">Errores</span>
-        <span class="info-valor" id="info-errores">0</span>
-      </div>
-      <div class="info-bloque">
-        <span class="info-etiqueta">Tiempo</span>
-        <span class="info-valor" id="info-tiempo">00:00</span>
-      </div>
-    </div>
-
-    <!-- Tablero generado por JavaScript -->
-    <div class="tablero-envoltorio">
-      <div id="tablero" class="tablero" role="grid" aria-label="Tablero de sudoku"></div>
-    </div>
-
-    <!-- Teclado numérico con contadores de números restantes -->
-    <div id="teclado" class="teclado"></div>
-
-    <!-- Barra de acciones (deshacer, borrar, apuntes, pista, nuevo) -->
-    <div class="acciones">
-      <button type="button" id="btn-deshacer" class="accion" disabled>
-        <span class="accion-icono">&#8630;</span>
-        <span class="accion-texto">Deshacer</span>
-      </button>
-      <button type="button" id="btn-borrar" class="accion">
-        <span class="accion-icono">&#9003;</span>
-        <span class="accion-texto">Borrar</span>
-      </button>
-      <button type="button" id="btn-notas" class="accion">
-        <span class="accion-icono">&#9998;</span>
-        <span class="accion-texto">Apuntes</span>
-      </button>
-      <button type="button" id="btn-pista" class="accion">
-        <span class="accion-icono">&#128161;</span>
-        <span class="accion-texto">Pista</span>
-      </button>
-      <button type="button" id="btn-nuevo" class="accion accion-nueva">
-        <span class="accion-texto">Nuevo juego</span>
-      </button>
-    </div>
-
-    <p class="estado" id="estado"></p>
-  </main>
-
-  <!-- ============ MODAL DE VICTORIA ============ -->
-  <div class="modal oculto" id="modal-victoria">
-    <div class="modal-tarjeta">
-      <h2 class="modal-titulo">¡Excelente!</h2>
-      <p class="modal-texto">Has completado el Sudoku correctamente.</p>
-      <div class="modal-datos">
-        <div>
-          <span class="info-etiqueta">Tiempo</span>
-          <span class="info-valor" id="modal-tiempo">00:00</span>
+            <!-- Selector de dificultad (pestañas) -->
+            <nav class="dificultades" id="dificultades" aria-label="Nivel de dificultad">
+                <button type="button" data-dificultad="facil">Fácil</button>
+                <button type="button" data-dificultad="medio" class="activo">Medio</button>
+                <button type="button" data-dificultad="dificil">Difícil</button>
+                <button type="button" data-dificultad="experto">Experto</button>
+            </nav>
         </div>
-        <div>
-          <span class="info-etiqueta">Errores</span>
-          <span class="info-valor" id="modal-errores">0</span>
-        </div>
-      </div>
-      <button type="button" id="btn-modal-nuevo" class="boton-principal">Jugar de nuevo</button>
-    </div>
-  </div>
+    </header>
 
-  <script src="script.js"></script>
+    <!-- ============ JUEGO ============ -->
+    <main class="juego">
+
+        <!-- Barra de información: dificultad, errores, tiempo y pausa -->
+        <section class="barra-info">
+            <div class="info-bloque">
+                <span class="info-etiqueta">Dificultad</span>
+                <span class="info-valor" id="info-dificultad">Medio</span>
+            </div>
+            <div class="info-bloque info-bloque-centro">
+                <span class="info-etiqueta">Errores</span>
+                <span class="info-valor">
+                    <span id="info-errores">0</span><span class="info-max">/3</span>
+                </span>
+            </div>
+            <div class="info-bloque info-bloque-derecha">
+                <div class="info-tiempo-grupo">
+                    <span class="info-etiqueta">Tiempo</span>
+                    <span class="info-valor info-valor-mono" id="info-tiempo">00:00</span>
+                </div>
+                <button type="button" id="btn-pausa" class="btn-pausa" title="Pausar o reanudar juego">
+                    <svg class="icono icono-pausa" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                        <path d="M6 4h4v16H6V4zm8 0h4v16h-4V4z"></path>
+                    </svg>
+                    <svg class="icono icono-play oculto" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                        <path d="M8 5v14l11-7z"></path>
+                    </svg>
+                </button>
+            </div>
+        </section>
+
+        <!-- Tablero generado por JavaScript -->
+        <div class="tablero-envoltorio">
+            <div id="tablero" class="tablero" role="grid" aria-label="Tablero de sudoku"></div>
+
+            <!-- Capa de pausa sobre el tablero -->
+            <div id="overlay-pausa" class="overlay-pausa oculto">
+                <div class="overlay-icono">
+                    <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                        <path d="M6 4h4v16H6V4zm8 0h4v16h-4V4z"></path>
+                    </svg>
+                </div>
+                <h2 class="overlay-titulo">Juego en Pausa</h2>
+                <p class="overlay-texto">Tómate un respiro. Tu tablero y tiempo están a salvo.</p>
+                <button type="button" id="btn-reanudar" class="btn-reanudar">
+                    <svg class="icono" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                        <path d="M8 5v14l11-7z"></path>
+                    </svg>
+                    Reanudar partida
+                </button>
+            </div>
+        </div>
+
+        <!-- Teclado numérico con contadores de números restantes -->
+        <div id="teclado" class="teclado"></div>
+
+        <!-- Barra de acciones (deshacer, borrar, apuntes, pista, nuevo) -->
+        <div class="acciones">
+            <button type="button" id="btn-deshacer" class="accion" disabled>
+                <svg class="accion-icono" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                    stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <path d="M3 10h10a5 5 0 015 5v2m0 0l-4-4m4 4l4-4M3 10l4-4m-4 4l4 4"></path>
+                </svg>
+                <span class="accion-texto">Deshacer</span>
+            </button>
+            <button type="button" id="btn-borrar" class="accion">
+                <svg class="accion-icono" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                    stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <path
+                        d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16">
+                    </path>
+                </svg>
+                <span class="accion-texto">Borrar</span>
+            </button>
+            <button type="button" id="btn-notas" class="accion">
+                <svg class="accion-icono" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                    stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <path
+                        d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z">
+                    </path>
+                </svg>
+                <span class="accion-texto">Apuntes</span>
+            </button>
+            <button type="button" id="btn-pista" class="accion">
+                <svg class="accion-icono accion-icono-pista" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                    <path
+                        d="M11 3a1 1 0 10-2 0v1a1 1 0 102 0V3zM15.657 5.757a1 1 0 00-1.414-1.414l-.707.707a1 1 0 001.414 1.414l.707-.707zM18 10a1 1 0 01-1 1h-1a1 1 0 110-2h1a1 1 0 011 1zM5.05 6.464A1 1 0 106.464 5.05l-.707-.707a1 1 0 00-1.414 1.414l.707.707zM5 10a1 1 0 01-1 1H3a1 1 0 110-2h1a1 1 0 011 1zM8 16v-1h4v1a2 2 0 11-4 0zM12 14c.015-.34.208-.646.477-.859a4 4 0 10-4.954 0c.27.213.462.519.476.859h4.001z">
+                    </path>
+                </svg>
+                <span class="accion-texto">Pista</span>
+            </button>
+            <button type="button" id="btn-nuevo" class="accion accion-nueva">
+                <svg class="accion-icono" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                    stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <path
+                        d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15">
+                    </path>
+                </svg>
+                <span class="accion-texto">Nuevo</span>
+            </button>
+        </div>
+
+        <p class="estado" id="estado"></p>
+    </main>
+
+    <!-- ============ MODAL DE VICTORIA ============ -->
+    <div class="modal oculto" id="modal-victoria">
+        <div class="modal-tarjeta">
+            <h2 class="modal-titulo">¡Excelente!</h2>
+            <p class="modal-texto">Has completado el Sudoku correctamente.</p>
+            <div class="modal-datos">
+                <div>
+                    <span class="info-etiqueta">Tiempo</span>
+                    <span class="info-valor" id="modal-tiempo">00:00</span>
+                </div>
+                <div>
+                    <span class="info-etiqueta">Errores</span>
+                    <span class="info-valor" id="modal-errores">0</span>
+                </div>
+            </div>
+            <button type="button" id="btn-modal-nuevo" class="boton-principal">Jugar de nuevo</button>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
 </body>
+
 </html>

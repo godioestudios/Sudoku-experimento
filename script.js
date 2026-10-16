@@ -57,7 +57,10 @@ let infoTiempoDOM = null;
 let infoDificultadDOM = null;
 let btnDeshacerDOM = null;
 let btnNotasDOM = null;
+let btnPausaDOM = null;
+let overlayPausaDOM = null;
 let modalVictoriaDOM = null;
+let partidaPausada = false;
 
 // ============================================================
 // 1. ALGORITMO — VALIDEZ Y RESOLUCIÓN
@@ -258,10 +261,11 @@ function formatearTiempo(total) {
 
 function iniciarCronometro() {
   detenerCronometro();
-  segundos = 0;
-  infoTiempoDOM.textContent = formatearTiempo(segundos);
-
+  if (segundos === 0 && !partidaPausada) {
+    infoTiempoDOM.textContent = formatearTiempo(segundos);
+  }
   intervalo = setInterval(() => {
+    if (partidaPausada) return;
     segundos++;
     infoTiempoDOM.textContent = formatearTiempo(segundos);
   }, 1000);
@@ -272,6 +276,32 @@ function detenerCronometro() {
     clearInterval(intervalo);
     intervalo = null;
   }
+}
+
+function actualizarBotonPausa() {
+  if (!btnPausaDOM) return;
+  btnPausaDOM.classList.toggle("en-pausa", partidaPausada);
+  btnPausaDOM.querySelector(".icono-pausa").classList.toggle("oculto", partidaPausada);
+  btnPausaDOM.querySelector(".icono-play").classList.toggle("oculto", !partidaPausada);
+  btnPausaDOM.title = partidaPausada ? "Reanudar juego" : "Pausar juego";
+}
+
+function pausarJuego() {
+  if (!partidaActiva) return;
+  partidaPausada = true;
+  detenerCronometro();
+  if (overlayPausaDOM) overlayPausaDOM.classList.remove("oculto");
+  actualizarBotonPausa();
+  pintarTablero();
+}
+
+function reanudarJuego() {
+  if (!partidaActiva) return;
+  partidaPausada = false;
+  if (overlayPausaDOM) overlayPausaDOM.classList.add("oculto");
+  actualizarBotonPausa();
+  iniciarCronometro();
+  pintarTablero();
 }
 
 // ============================================================
@@ -338,7 +368,7 @@ function guardarHistorial() {
 
 /** Deshace el último movimiento guardado. */
 function deshacer() {
-  if (!partidaActiva || historial.length === 0) return;
+  if (!partidaActiva || partidaPausada || historial.length === 0) return;
 
   const estado = historial.pop();
   tableroJuego = estado.tablero;
@@ -355,7 +385,7 @@ function deshacer() {
 
 /** Selecciona (o deselecciona) una casilla al hacer clic. */
 function seleccionarCelda(fila, columna) {
-  if (!partidaActiva) return;
+  if (!partidaActiva || partidaPausada) return;
 
   if (seleccion && seleccion.fila === fila && seleccion.columna === columna) {
     seleccion = null; // Clic repetido: deseleccionar
@@ -371,7 +401,7 @@ function seleccionarCelda(fila, columna) {
  * Si el modo apuntes está activo, añade/quita el número como nota.
  */
 function colocarNumero(numero) {
-  if (!partidaActiva || seleccion === null) return;
+  if (!partidaActiva || partidaPausada || seleccion === null) return;
 
   const { fila, columna } = seleccion;
   if (celdasFijas[fila][columna]) return; // Las casillas iniciales no se tocan
@@ -409,7 +439,7 @@ function colocarNumero(numero) {
 
 /** Borra el número (y los apuntes) de la casilla seleccionada. */
 function borrarCelda() {
-  if (!partidaActiva || seleccion === null) return;
+  if (!partidaActiva || partidaPausada || seleccion === null) return;
 
   const { fila, columna } = seleccion;
   if (celdasFijas[fila][columna]) return;
@@ -425,7 +455,7 @@ function borrarCelda() {
 
 /** Rellena una casilla con su número correcto (pista inteligente). */
 function darPista() {
-  if (!partidaActiva) return;
+  if (!partidaActiva || partidaPausada) return;
 
   // Si no hay casilla seleccionada, elegimos una vacía al azar
   if (seleccion === null) {
@@ -497,6 +527,23 @@ function pintarTablero() {
     const columna = Number(celda.dataset.columna);
     const valor = tableroJuego[fila][columna];
     const esFija = celdasFijas[fila][columna];
+
+    if (partidaPausada) {
+      celda.innerHTML = "";
+      celda.textContent = "";
+      celda.classList.remove(
+        "fija",
+        "jugador",
+        "seleccionada",
+        "en-area",
+        "mismo-numero",
+        "error"
+      );
+      celda.classList.add("pausado");
+      continue;
+    }
+
+    celda.classList.remove("pausado");
 
     // --- Contenido (número, apuntes o nada) ---
     if (valor !== 0) {
@@ -575,6 +622,7 @@ function comprobarVictoria() {
   partidaActiva = false;
   seleccion = null;
   detenerCronometro();
+  if (btnPausaDOM) btnPausaDOM.disabled = true;
   estadoDOM.textContent = "¡Sudoku completado!";
   estadoDOM.classList.add("victoria");
 
@@ -593,6 +641,11 @@ function nuevoJuego() {
 
   // Cerramos el modal y preparamos la interfaz
   modalVictoriaDOM.classList.add("oculto");
+  if (overlayPausaDOM) overlayPausaDOM.classList.add("oculto");
+  partidaPausada = false;
+  actualizarBotonPausa();
+  segundos = 0;
+  infoTiempoDOM.textContent = formatearTiempo(segundos);
   estadoDOM.textContent = "Generando puzzle...";
   estadoDOM.classList.remove("victoria");
   partidaActiva = false;
@@ -602,6 +655,7 @@ function nuevoJuego() {
   document
     .querySelectorAll(".acciones button, .teclado button")
     .forEach((b) => (b.disabled = true));
+  if (btnPausaDOM) btnPausaDOM.disabled = true;
 
   // Retardo mínimo para que el navegador pinte el mensaje antes de calcular
   setTimeout(() => {
@@ -622,6 +676,7 @@ function nuevoJuego() {
     document
       .querySelectorAll(".acciones button, .teclado button")
       .forEach((b) => (b.disabled = false));
+    if (btnPausaDOM) btnPausaDOM.disabled = false;
 
     pintarTablero();
     estadoDOM.textContent = "Selecciona una casilla y coloca un número.";
@@ -636,6 +691,17 @@ function nuevoJuego() {
 
 function manejarTeclado(evento) {
   if (!partidaActiva) return;
+
+  // Con la partida en pausa, la tecla P reanuda y nada más se procesa
+  if (partidaPausada) {
+    if (evento.key.toLowerCase() === "p") reanudarJuego();
+    return;
+  }
+
+  if (evento.key.toLowerCase() === "p") {
+    pausarJuego();
+    return;
+  }
 
   // Flechas: mover la selección
   if (evento.key.startsWith("Arrow")) {
@@ -718,6 +784,12 @@ function iniciarApp() {
   document.getElementById("btn-pista").addEventListener("click", darPista);
   document.getElementById("btn-nuevo").addEventListener("click", nuevoJuego);
   document.getElementById("btn-modal-nuevo").addEventListener("click", nuevoJuego);
+  btnPausaDOM = document.getElementById("btn-pausa");
+  btnPausaDOM.addEventListener("click", () => (partidaPausada ? reanudarJuego() : pausarJuego()));
+
+  // Capa de pausa sobre el tablero
+  overlayPausaDOM = document.getElementById("overlay-pausa");
+  document.getElementById("btn-reanudar").addEventListener("click", reanudarJuego);
 
   // Teclado físico
   document.addEventListener("keydown", manejarTeclado);
