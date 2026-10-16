@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sudoku — Juega gratis</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <!-- ============ CABECERA ============ -->
+  <header class="cabecera">
+    <div class="cabecera-contenido">
+      <div class="logo">
+        <span class="logo-icono">S</span>
+        <span class="logo-texto">Sudoku</span>
+      </div>
+
+      <!-- Selector de dificultad (pestañas) -->
+      <nav class="dificultades" id="dificultades">
+        <button type="button" data-dificultad="facil">Fácil</button>
+        <button type="button" data-dificultad="medio" class="activo">Medio</button>
+        <button type="button" data-dificultad="dificil">Difícil</button>
+        <button type="button" data-dificultad="experto">Experto</button>
+      </nav>
+    </div>
+  </header>
+
+  <!-- ============ JUEGO ============ -->
+  <main class="juego">
+
+    <!-- Barra de información: dificultad, errores y tiempo -->
+    <div class="barra-info">
+      <div class="info-bloque">
+        <span class="info-etiqueta">Dificultad</span>
+        <span class="info-valor" id="info-dificultad">Medio</span>
+      </div>
+      <div class="info-bloque">
+        <span class="info-etiqueta">Errores</span>
+        <span class="info-valor" id="info-errores">0</span>
+      </div>
+      <div class="info-bloque">
+        <span class="info-etiqueta">Tiempo</span>
+        <span class="info-valor" id="info-tiempo">00:00</span>
+      </div>
+    </div>
+
+    <!-- Tablero generado por JavaScript -->
+    <div class="tablero-envoltorio">
+      <div id="tablero" class="tablero" role="grid" aria-label="Tablero de sudoku"></div>
+    </div>
+
+    <!-- Teclado numérico con contadores de números restantes -->
+    <div id="teclado" class="teclado"></div>
+
+    <!-- Barra de acciones (deshacer, borrar, apuntes, pista, nuevo) -->
+    <div class="acciones">
+      <button type="button" id="btn-deshacer" class="accion" disabled>
+        <span class="accion-icono">&#8630;</span>
+        <span class="accion-texto">Deshacer</span>
+      </button>
+      <button type="button" id="btn-borrar" class="accion">
+        <span class="accion-icono">&#9003;</span>
+        <span class="accion-texto">Borrar</span>
+      </button>
+      <button type="button" id="btn-notas" class="accion">
+        <span class="accion-icono">&#9998;</span>
+        <span class="accion-texto">Apuntes</span>
+      </button>
+      <button type="button" id="btn-pista" class="accion">
+        <span class="accion-icono">&#128161;</span>
+        <span class="accion-texto">Pista</span>
+      </button>
+      <button type="button" id="btn-nuevo" class="accion accion-nueva">
+        <span class="accion-texto">Nuevo juego</span>
+      </button>
+    </div>
+
+    <p class="estado" id="estado"></p>
+  </main>
+
+  <!-- ============ MODAL DE VICTORIA ============ -->
+  <div class="modal oculto" id="modal-victoria">
+    <div class="modal-tarjeta">
+      <h2 class="modal-titulo">¡Excelente!</h2>
+      <p class="modal-texto">Has completado el Sudoku correctamente.</p>
+      <div class="modal-datos">
+        <div>
+          <span class="info-etiqueta">Tiempo</span>
+          <span class="info-valor" id="modal-tiempo">00:00</span>
+        </div>
+        <div>
+          <span class="info-etiqueta">Errores</span>
+          <span class="info-valor" id="modal-errores">0</span>
+        </div>
+      </div>
+      <button type="button" id="btn-modal-nuevo" class="boton-principal">Jugar de nuevo</button>
+    </div>
+  </div>
+
+  <script src="script.js"></script>
+</body>
+</html>
