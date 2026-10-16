@@ -6,8 +6,8 @@
     position: relative;
     width: max-content;
     margin: 0 auto;
-    background: #ffffff;
-    border: 3px solid var(--slate-800);
+    background: var(--superficie);
+    border: 3px solid var(--borde-tablero);
     border-radius: 16px;
     box-shadow: var(--sombra-elevada);
     padding: 2px;
@@ -18,7 +18,7 @@
     display: grid;
     grid-template-columns: repeat(9, var(--celda));
     grid-template-rows: repeat(9, var(--celda));
-    background: #ffffff;
+    background: var(--superficie);
     overflow: hidden;
     border-radius: 12px;
 }

@@ -10,6 +10,19 @@
     <link
         href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap"
         rel="stylesheet">
+    <script>
+        (function () {
+            try {
+                var guardado = localStorage.getItem("sudoku-tema");
+                var oscuro = guardado
+                    ? guardado === "oscuro"
+                    : window.matchMedia("(prefers-color-scheme: dark)").matches;
+                document.documentElement.setAttribute("data-theme", oscuro ? "oscuro" : "claro");
+            } catch (e) {
+                document.documentElement.setAttribute("data-theme", "claro");
+            }
+        })();
+    </script>
 </head>
 
 <body>

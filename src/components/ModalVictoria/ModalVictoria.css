@@ -16,7 +16,7 @@
 }
 
 .modal-tarjeta {
-    background: #fff;
+    background: var(--superficie);
     border-radius: 20px;
     padding: 28px 26px;
     width: 100%;
@@ -41,14 +41,14 @@
 .modal-titulo {
     margin: 0 0 8px;
     font-size: 24px;
-    color: var(--brand-600);
+    color: var(--acento);
     font-weight: 800;
 }
 
 .modal-texto {
     margin: 0 0 18px;
     font-size: 14px;
-    color: var(--slate-500);
+    color: var(--texto-tenue);
 }
 
 .modal-datos {

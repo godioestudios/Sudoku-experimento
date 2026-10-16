@@ -16,11 +16,11 @@
     text-align: center;
     font-size: 13px;
     font-weight: 500;
-    color: var(--slate-500);
+    color: var(--texto-tenue);
 }
 
 .estado.victoria {
-    color: var(--brand-600);
+    color: var(--acento);
     font-weight: 700;
 }
 
@@ -30,11 +30,11 @@
     width: max-content;
     margin: 0 auto;
     padding: 60px 40px;
-    background: #ffffff;
-    border: 3px solid var(--slate-800);
+    background: var(--superficie);
+    border: 3px solid var(--borde-tablero);
     border-radius: 16px;
     box-shadow: var(--sombra-elevada);
-    color: var(--slate-500);
+    color: var(--texto-tenue);
     font-size: 13px;
     font-weight: 600;
 }

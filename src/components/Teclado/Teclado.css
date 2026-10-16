@@ -17,8 +17,8 @@
     justify-content: center;
     border: 1px solid var(--borde);
     border-radius: 12px;
-    background: #ffffff;
-    color: var(--brand-600);
+    background: var(--superficie);
+    color: var(--acento);
     font-size: 20px;
     font-weight: 700;
     padding: 8px 0 18px;
@@ -28,8 +28,8 @@
 }
 
 .tecla:hover {
-    border-color: var(--brand-500);
-    background: rgba(239, 246, 255, 0.5);
+    border-color: var(--acento);
+    background: var(--acento-fondo);
 }
 
 .tecla:active {
@@ -53,7 +53,7 @@
     text-align: center;
     font-size: 10px;
     font-weight: 600;
-    color: var(--slate-400);
+    color: var(--texto-tenue);
 }
 
 /* Cuando ya se colocaron las 9 veces: se apaga */

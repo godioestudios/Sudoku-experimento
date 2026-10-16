@@ -9,21 +9,21 @@
     outline: none;
     padding: 0;
     margin: 0;
-    background: #ffffff;
+    background: var(--superficie);
     cursor: pointer;
     display: flex;
     align-items: center;
     justify-content: center;
     font-size: calc(var(--celda) * 0.5);
     font-weight: 500;
-    color: var(--slate-900);
+    color: var(--texto-fuerte);
     position: relative;
     transition: background 0.12s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 /* Números fijos (los que vienen con el puzzle) */
 .celda.fija {
-    color: var(--slate-900);
+    color: var(--texto-fuerte);
     font-weight: 700;
     cursor: default;
 }
@@ -37,19 +37,19 @@
 /* --- Resaltados --- */
 
 .celda.en-area {
-    background: var(--slate-100);
+    background: var(--celda-area);
 }
 
 .celda.mismo-numero {
-    background: #e0e7ff;
-    color: #1e3a8a;
+    background: var(--celda-resalte);
+    color: var(--celda-resalte-texto);
     font-weight: 700;
 }
 
 .celda.seleccionada {
-    background: #c7d2fe;
-    box-shadow: inset 0 0 0 2px #3b82f6;
-    color: #1e3a8a;
+    background: var(--celda-seleccion);
+    box-shadow: inset 0 0 0 2px var(--celda-seleccion-borde);
+    color: var(--celda-resalte-texto);
 }
 
 /* Número incorrecto (no coincide con la solución) — el último, gana siempre */
@@ -64,16 +64,16 @@
     position: absolute;
     inset: 0;
     pointer-events: none;
-    border-right: 1px solid var(--slate-200);
-    border-bottom: 1px solid var(--slate-200);
+    border-right: 1px solid var(--borde-celda);
+    border-bottom: 1px solid var(--borde-celda);
 }
 
 .celda.borde-derecha::after {
-    border-right: 2.5px solid var(--slate-700);
+    border-right: 2.5px solid var(--borde-celda-fuerte);
 }
 
 .celda.borde-abajo::after {
-    border-bottom: 2.5px solid var(--slate-700);
+    border-bottom: 2.5px solid var(--borde-celda-fuerte);
 }
 
 /* ---------- Apuntes (notas/candidatos) ---------- */
@@ -93,7 +93,7 @@
     justify-content: center;
     font-size: calc(var(--celda) * 0.26);
     font-weight: 600;
-    color: var(--slate-600);
+    color: var(--texto-tenue);
     line-height: 1;
 }
 

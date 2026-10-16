@@ -4,6 +4,8 @@
    ============================================================ */
 
 :root {
+    color-scheme: light;
+
     --brand-50: #eef4ff;
     --brand-100: #e0ebff;
     --brand-200: #c7d7fe;
@@ -23,11 +25,45 @@
     --slate-800: #1e293b;
     --slate-900: #0f172a;
 
+    /* Superficies */
     --fondo: var(--slate-50);
+    --superficie: #ffffff;
+    --superficie-suave: var(--slate-100);
+
+    /* Texto */
+    --texto: var(--slate-800);
+    --texto-fuerte: var(--slate-900);
+    --texto-tenue: var(--slate-500);
+
+    /* Bordes */
     --borde: var(--slate-200);
+    --borde-suave: var(--slate-100);
+    --borde-interactivo: var(--slate-300);
+    --borde-tablero: var(--slate-800);
+    --borde-celda: var(--slate-200);
+    --borde-celda-fuerte: var(--slate-700);
+
+    /* Acento */
+    --acento: var(--brand-600);
+    --acento-texto: var(--brand-700);
+    --acento-fondo: rgba(239, 246, 255, 0.55);
+    --acento-fondo-suave: var(--brand-100);
+
+    /* Chips y badges */
+    --chip-fondo: rgba(226, 232, 240, 0.7);
+    --badge-fondo: rgba(224, 235, 255, 0.7);
+
+    /* Resaltados del tablero */
+    --celda-area: var(--slate-100);
+    --celda-resalte: #e0e7ff;
+    --celda-resalte-texto: #1e3a8a;
+    --celda-seleccion: #c7d2fe;
+    --celda-seleccion-borde: #3b82f6;
+
+    /* Semánticas de estado */
+    --input: #2563eb;
     --error: #dc2626;
     --error-fondo: #fee2e2;
-    --input: #2563eb;
 
     --sombra-soft: 0 4px 20px -2px rgba(27, 46, 94, 0.06),
         0 2px 6px -1px rgba(27, 46, 94, 0.04);
@@ -35,6 +71,52 @@
         0 4px 12px -2px rgba(0, 0, 0, 0.05);
 
     --celda: 52px;
+}
+
+/* ============================================================
+   TEMA OSCURO
+   ============================================================ */
+
+[data-theme="oscuro"] {
+    color-scheme: dark;
+
+    --fondo: #0b1120;
+    --superficie: #1e293b;
+    --superficie-suave: #334155;
+
+    --texto: #e2e8f0;
+    --texto-fuerte: #f8fafc;
+    --texto-tenue: #94a3b8;
+
+    --borde: #334155;
+    --borde-suave: #293548;
+    --borde-interactivo: #64748b;
+    --borde-tablero: #64748b;
+    --borde-celda: #334155;
+    --borde-celda-fuerte: #94a3b8;
+
+    --acento: #60a5fa;
+    --acento-texto: #93c5fd;
+    --acento-fondo: rgba(96, 165, 250, 0.16);
+    --acento-fondo-suave: rgba(96, 165, 250, 0.22);
+
+    --chip-fondo: rgba(51, 65, 85, 0.7);
+    --badge-fondo: rgba(96, 165, 250, 0.18);
+
+    --celda-area: #334155;
+    --celda-resalte: #312e81;
+    --celda-resalte-texto: #e0e7ff;
+    --celda-seleccion: #4338ca;
+    --celda-seleccion-borde: #60a5fa;
+
+    --input: #60a5fa;
+    --error: #f87171;
+    --error-fondo: #7f1d1d;
+
+    --sombra-soft: 0 4px 20px -2px rgba(0, 0, 0, 0.45),
+        0 2px 6px -1px rgba(0, 0, 0, 0.35);
+    --sombra-elevada: 0 12px 30px -4px rgba(0, 0, 0, 0.55),
+        0 4px 12px -2px rgba(0, 0, 0, 0.4);
 }
 
 * {
@@ -46,9 +128,10 @@ body {
     margin: 0;
     min-height: 100vh;
     background: var(--fondo);
-    color: var(--slate-800);
+    color: var(--texto);
     font-family: "Plus Jakarta Sans", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
     -webkit-font-smoothing: antialiased;
+    transition: background 0.2s, color 0.2s;
 }
 
 button {

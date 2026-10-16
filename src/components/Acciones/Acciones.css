@@ -17,8 +17,8 @@
     gap: 4px;
     border: 1px solid var(--borde);
     border-radius: 12px;
-    background: #ffffff;
-    color: var(--slate-700);
+    background: var(--superficie);
+    color: var(--texto);
     font-size: 11px;
     font-weight: 600;
     padding: 10px 4px;
@@ -28,8 +28,8 @@
 }
 
 .accion:hover:not(:disabled) {
-    background: var(--slate-50);
-    border-color: var(--slate-300);
+    background: var(--superficie-suave);
+    border-color: var(--borde-interactivo);
 }
 
 .accion:active:not(:disabled) {
@@ -44,7 +44,7 @@
 .accion-icono {
     width: 20px;
     height: 20px;
-    color: var(--slate-600);
+    color: var(--texto-tenue);
 }
 
 .accion-icono-pista {
@@ -53,8 +53,8 @@
 
 /* Botón de apuntes activado */
 .accion.activa {
-    border-color: var(--brand-500);
-    background: rgba(239, 246, 255, 0.6);
+    border-color: var(--acento);
+    background: var(--acento-fondo);
 }
 
 /* Botón "Nuevo" (destacado) */

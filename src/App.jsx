@@ -1,4 +1,5 @@
 import { useSudoku } from "./hooks/useSudoku.js";
+import { useTema } from "./hooks/useTema.js";
 import Cabecera from "./components/Cabecera/Cabecera.jsx";
 import BarraInfo from "./components/BarraInfo/BarraInfo.jsx";
 import Tablero from "./components/Tablero/Tablero.jsx";
@@ -9,12 +10,15 @@ import "./App.css";
 
 const App = () => {
   const juego = useSudoku();
+  const { tema, alternarTema } = useTema();
 
   return (
     <>
       <Cabecera
         dificultad={juego.dificultad}
         onCambiarDificultad={juego.cambiarDificultad}
+        tema={tema}
+        onAlternarTema={alternarTema}
       />
 
       <main className="juego">
