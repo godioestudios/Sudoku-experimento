@@ -19,10 +19,7 @@ export default function BarraInfo({
 
       <div className="info-bloque info-bloque-centro">
         <span className="info-etiqueta">Errores</span>
-        <span className="info-valor">
-          <span>{errores}</span>
-          <span className="info-max">/3</span>
-        </span>
+        <span className="info-valor">{errores}</span>
       </div>
 
       <div className="info-bloque info-bloque-derecha">

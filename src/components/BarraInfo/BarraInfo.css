@@ -64,11 +64,6 @@
     font-variant-numeric: tabular-nums;
 }
 
-.info-max {
-    color: var(--slate-400);
-    font-weight: 500;
-}
-
 /* ---------- Botón de pausa ---------- */
 
 .btn-pausa {
