@@ -125,15 +125,11 @@ export function useSudoku() {
       const { fila, columna } = seleccion;
       if (celdasFijas[fila][columna]) return; // Las casillas iniciales no se tocan
 
-      guardarHistorial();
-
       if (modoNotas) {
         // En modo apuntes solo trabajamos sobre casillas vacías
-        if (tableroJuego[fila][columna] !== 0) {
-          setHistorial((previo) => previo.slice(0, -1)); // No hubo cambio real
-          return;
-        }
+        if (tableroJuego[fila][columna] !== 0) return;
 
+        guardarHistorial();
         setPartida((previo) => {
           const nuevasNotas = copiarNotas(previo.notas);
           const candidatos = nuevasNotas[fila][columna];
@@ -142,6 +138,7 @@ export function useSudoku() {
           return { ...previo, notas: nuevasNotas };
         });
       } else {
+        guardarHistorial();
         setPartida((previo) => {
           const nuevoTablero = copiarTablero(previo.tableroJuego);
           nuevoTablero[fila][columna] = numero;
@@ -197,7 +194,12 @@ export function useSudoku() {
           if (tableroJuego[f][c] === 0) vacias.push([f, c]);
         }
       }
-      if (vacias.length === 0) return;
+      if (vacias.length === 0) {
+        setEstado(
+          "No quedan casillas vacías para revelar. Revisá los números incorrectos del tablero."
+        );
+        return;
+      }
       const [f, c] = vacias[Math.floor(Math.random() * vacias.length)];
       destino = { fila: f, columna: c };
     }
