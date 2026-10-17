@@ -684,6 +684,23 @@ const HIDDEN_PARES_EN_CRUZ = [
   [3, 0, 5, 0, 8, 0, 0, 0, 0],
 ];
 
+// Puzzle de solución única que queda BLOQUEADO con singles y naked
+// pairs, pero se desbloquea con un hidden pair: en la fila 2 los
+// números 1 y 8 solo caben en (2,4) y (2,5), así que el par oculto
+// {1,8} elimina el resto de candidatos de esas dos casillas y habilita
+// un single que permite terminar el puzzle.
+const HIDDEN_PAIR_DESBLOQUEA = [
+  [8, 0, 6, 0, 0, 0, 0, 2, 5],
+  [0, 0, 3, 0, 0, 4, 0, 9, 1],
+  [5, 4, 9, 0, 0, 0, 0, 0, 0],
+  [0, 0, 0, 8, 2, 0, 0, 4, 9],
+  [0, 8, 0, 0, 0, 0, 7, 0, 0],
+  [3, 0, 0, 0, 0, 0, 0, 8, 0],
+  [0, 0, 7, 0, 0, 0, 0, 0, 4],
+  [0, 0, 0, 1, 7, 0, 0, 6, 0],
+  [2, 6, 0, 5, 4, 0, 9, 0, 0],
+];
+
 test("detectarHiddenPares encuentra un par oculto en una fila", () => {
   const pares = detectarHiddenPares(HIDDEN_PAIR_FILA);
   const par = pares.find(
@@ -806,4 +823,197 @@ test("detectarHiddenPares no modifica el tablero original", () => {
   const original = copiarTablero(HIDDEN_PAIR_FILA);
   detectarHiddenPares(HIDDEN_PAIR_FILA);
   assert.deepEqual(HIDDEN_PAIR_FILA, original);
+});
+
+// ------------------------------------------------------------
+// Hidden pairs integrados en resolverLogico
+// ------------------------------------------------------------
+
+// Reproduce los pasos de un solver sobre un tablero, llevando el
+// registro de candidatos eliminados. Devuelve el estado del tablero
+// justo antes del paso `hasta`.
+function estadoAntesDe(tablero, pasos, hasta) {
+  const enJuego = copiarTablero(tablero);
+  const eliminados = new Set();
+  for (let i = 0; i < hasta; i++) {
+    const paso = pasos[i];
+    if (paso.eliminados) {
+      for (const [fila, columna, numero] of paso.eliminados) {
+        eliminados.add(`${fila},${columna},${numero}`);
+      }
+    } else {
+      enJuego[paso.fila][paso.columna] = paso.numero;
+    }
+  }
+  return { enJuego, eliminados };
+}
+
+test("un hidden pair desbloquea un puzzle que antes quedaba bloqueado", () => {
+  const original = copiarTablero(HIDDEN_PAIR_DESBLOQUEA);
+  assert.equal(contarSoluciones(copiarTablero(HIDDEN_PAIR_DESBLOQUEA), 2), 1);
+
+  const { estado, pasos, tablero } = resolverLogico(HIDDEN_PAIR_DESBLOQUEA);
+
+  assert.equal(estado, ESTADOS.RESUELTO);
+  assert.equal(tablero.flat().filter((v) => v === 0).length, 0);
+
+  const indicePar = pasos.findIndex((p) => p.tecnica === TECNICAS.HIDDEN_PAIR);
+  assert.ok(indicePar >= 0);
+
+  // Justo antes del primer hidden pair no había ninguna técnica previa
+  // disponible: ni singles ni naked pairs efectivos. Es decir, con las
+  // técnicas anteriores el puzzle se quedaba bloqueado.
+  const { enJuego, eliminados } = estadoAntesDe(HIDDEN_PAIR_DESBLOQUEA, pasos, indicePar);
+  assert.equal(detectarNakedSingles(enJuego, eliminados).length, 0);
+  assert.equal(detectarHiddenSingles(enJuego, eliminados).length, 0);
+  assert.equal(
+    detectarNakedPares(enJuego, eliminados).filter((p) => p.eliminados.length > 0).length,
+    0
+  );
+  // ...pero sí había un hidden pair aplicable.
+  assert.ok(
+    detectarHiddenPares(enJuego, eliminados).some((p) => p.eliminados.length > 0)
+  );
+
+  // El tablero original no se modifica
+  assert.deepEqual(HIDDEN_PAIR_DESBLOQUEA, original);
+});
+
+test("los pasos con hidden pairs se reproducen sin contradicciones", () => {
+  const { pasos, tablero } = resolverLogico(HIDDEN_PAIR_DESBLOQUEA);
+
+  const enJuego = copiarTablero(HIDDEN_PAIR_DESBLOQUEA);
+  const eliminados = new Set();
+
+  for (const paso of pasos) {
+    if (
+      paso.tecnica === TECNICAS.NAKED_SINGLE ||
+      paso.tecnica === TECNICAS.HIDDEN_SINGLE
+    ) {
+      assert.ok(
+        esValido(enJuego, paso.fila, paso.columna, paso.numero),
+        `paso contradictorio en (${paso.fila},${paso.columna}) = ${paso.numero}`
+      );
+      enJuego[paso.fila][paso.columna] = paso.numero;
+      continue;
+    }
+
+    // Técnicas de par: no colocan número y registran eliminaciones reales
+    assert.equal(paso.numero, undefined);
+    assert.equal(paso.celdas.length, 2);
+    assert.equal(paso.candidatos.length, 2);
+    assert.ok(paso.eliminados.length > 0);
+
+    for (const [fila, columna, numero] of paso.eliminados) {
+      const clave = `${fila},${columna},${numero}`;
+      const candidatos = obtenerCandidatos(enJuego, fila, columna).filter(
+        (n) => !eliminados.has(`${fila},${columna},${n}`)
+      );
+      // La eliminación debe quitar un candidato que todavía está presente
+      assert.ok(candidatos.includes(numero), `eliminación inexistente ${clave}`);
+
+      if (paso.tecnica === TECNICAS.HIDDEN_PAIR) {
+        // En un hidden pair lo eliminado NO son los números del par y la
+        // casilla afectada es una de las dos del par
+        assert.ok(!paso.candidatos.includes(numero));
+        assert.ok(paso.celdas.some(([f, c]) => f === fila && c === columna));
+      } else {
+        // En un naked pair lo eliminado SON los números del par y la
+        // casilla afectada NO es una de las dos del par
+        assert.ok(paso.candidatos.includes(numero));
+        assert.ok(!paso.celdas.some(([f, c]) => f === fila && c === columna));
+      }
+
+      eliminados.add(clave);
+    }
+  }
+
+  assert.deepEqual(enJuego, tablero);
+  assert.equal(tableroEsValido(tablero), true);
+});
+
+test("las técnicas conservan su prioridad (singles y naked pairs antes que hidden pairs)", () => {
+  const fixtures = [
+    HIDDEN_PAIR_DESBLOQUEA,
+    SE_BLOQUEA_DESPUES,
+    PAR_HABILITA_SINGLES_SIN_SINGLES,
+    RESOLUBLE_SINGLES,
+  ];
+
+  for (const fixture of fixtures) {
+    const { pasos } = resolverLogico(fixture);
+    const enJuego = copiarTablero(fixture);
+    const eliminados = new Set();
+
+    for (const paso of pasos) {
+      // Un hidden single solo se aplica cuando no hay naked singles
+      if (paso.tecnica === TECNICAS.HIDDEN_SINGLE) {
+        assert.equal(detectarNakedSingles(enJuego, eliminados).length, 0);
+      }
+
+      if (paso.eliminados) {
+        // Antes de cualquier par no debe quedar ningún single
+        assert.equal(detectarNakedSingles(enJuego, eliminados).length, 0);
+        assert.equal(detectarHiddenSingles(enJuego, eliminados).length, 0);
+
+        // Un hidden pair solo se aplica cuando no hay naked pairs efectivos
+        if (paso.tecnica === TECNICAS.HIDDEN_PAIR) {
+          assert.equal(
+            detectarNakedPares(enJuego, eliminados).filter(
+              (p) => p.eliminados.length > 0
+            ).length,
+            0
+          );
+        }
+
+        for (const [fila, columna, numero] of paso.eliminados) {
+          eliminados.add(`${fila},${columna},${numero}`);
+        }
+      } else {
+        enJuego[paso.fila][paso.columna] = paso.numero;
+      }
+    }
+  }
+});
+
+test("resolverLogico registra hidden pairs sin colocar números ni eliminar de más", () => {
+  const { pasos } = resolverLogico(HIDDEN_PAIR_DESBLOQUEA);
+  const pares = pasos.filter((p) => p.tecnica === TECNICAS.HIDDEN_PAIR);
+
+  assert.ok(pares.length > 0);
+  for (const par of pares) {
+    assert.equal(par.numero, undefined);
+    assert.equal(par.celdas.length, 2);
+    assert.equal(par.candidatos.length, 2);
+    assert.ok(par.eliminados.length > 0);
+    assert.ok(["fila", "columna", "caja"].includes(par.unidad));
+  }
+});
+
+test("las eliminaciones de un hidden pair habilitan un single en una iteración posterior", () => {
+  const { pasos } = resolverLogico(HIDDEN_PAIR_DESBLOQUEA);
+  const indicePar = pasos.findIndex((p) => p.tecnica === TECNICAS.HIDDEN_PAIR);
+  assert.ok(indicePar >= 0);
+
+  const { enJuego, eliminados } = estadoAntesDe(HIDDEN_PAIR_DESBLOQUEA, pasos, indicePar);
+
+  // Antes de aplicar el par no hay ningún single...
+  assert.equal(detectarNakedSingles(enJuego, eliminados).length, 0);
+  assert.equal(detectarHiddenSingles(enJuego, eliminados).length, 0);
+
+  // ...y tras descontar sus eliminaciones aparece al menos un single.
+  const conEliminaciones = new Set(eliminados);
+  for (const [fila, columna, numero] of pasos[indicePar].eliminados) {
+    conEliminaciones.add(`${fila},${columna},${numero}`);
+  }
+  const singles =
+    detectarNakedSingles(enJuego, conEliminaciones).length +
+    detectarHiddenSingles(enJuego, conEliminaciones).length;
+  assert.ok(singles > 0);
+
+  // El solver lo detecta en la iteración siguiente (progreso garantizado)
+  assert.ok(
+    pasos[indicePar + 1].tecnica === TECNICAS.NAKED_SINGLE ||
+      pasos[indicePar + 1].tecnica === TECNICAS.HIDDEN_SINGLE
+  );
 });
