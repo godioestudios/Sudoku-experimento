@@ -166,10 +166,17 @@ export function generarTableroResuelto() {
 }
 
 /**
- * Vacía casillas del tablero resuelto para crear el puzzle,
- * cuidando que siga teniendo UNA ÚNICA solución.
+ * Un intento de vaciado: recorre las posiciones en orden aleatorio y
+ * vacía cada casilla solo si el puzzle sigue teniendo solución única.
+ *
+ * Como al quitar pistas solo se pueden agregar soluciones (nunca
+ * quitar), una casilla que rompe la unicidad en un momento dado
+ * tampoco se podrá vaciar más adelante. Por eso un mismo orden no
+ * mejora repitiéndolo: cada intento necesita un orden nuevo.
+ *
+ * @returns {{puzzle: number[][], vacias: number}}
  */
-export function crearPuzzle(tableroResuelto, objetivoVacias) {
+function intentoDeVaciado(tableroResuelto, objetivoVacias) {
   const puzzle = copiarTablero(tableroResuelto);
 
   const posiciones = [];
@@ -194,7 +201,53 @@ export function crearPuzzle(tableroResuelto, objetivoVacias) {
     }
   }
 
-  return puzzle;
+  return { puzzle, vacias };
+}
+
+/**
+ * Vacía casillas del tablero resuelto para crear el puzzle,
+ * cuidando que siga teniendo UNA ÚNICA solución.
+ *
+ * El primer intento hace una pasada greedy con orden aleatorio. Si se
+ * queda corto se reintenta con otro orden desde el tablero completo
+ * (cada orden alcanza un máximo distinto), conservando siempre el
+ * mejor tablero válido obtenido. Nunca se elimina una casilla sin
+ * comprobar antes que la solución siga siendo única.
+ *
+ * Los reintentos se detienen al alcanzar el objetivo, al agotar los
+ * intentos o al consumir el presupuesto de tiempo, para no demorar
+ * innecesariamente la generación.
+ *
+ * Nota: "vacías" mide casillas vacías, no dificultad lógica real;
+ * un puzzle con 56 vacías puede ser más fácil de resolver que otro
+ * con menos si sus técnicas de deducción son más directas.
+ *
+ * @param {number[][]} tableroResuelto - Solución completa (no se modifica).
+ * @param {number} objetivoVacias - Casillas vacías deseadas.
+ * @param {{maxIntentos?: number, presupuestoMs?: number}} opciones
+ */
+export function crearPuzzle(tableroResuelto, objetivoVacias, opciones = {}) {
+  const maxIntentos = Math.max(1, opciones.maxIntentos ?? 5);
+  const presupuestoMs = opciones.presupuestoMs ?? 3000;
+  const inicio = performance.now();
+
+  let mejorPuzzle = null;
+  let mejorVacias = -1;
+
+  for (let intento = 0; intento < maxIntentos; intento++) {
+    // El primer intento corre siempre; los demás solo si queda presupuesto
+    if (intento > 0 && performance.now() - inicio >= presupuestoMs) break;
+    if (mejorVacias >= objetivoVacias) break;
+
+    const { puzzle, vacias } = intentoDeVaciado(tableroResuelto, objetivoVacias);
+
+    if (vacias > mejorVacias) {
+      mejorPuzzle = puzzle;
+      mejorVacias = vacias;
+    }
+  }
+
+  return mejorPuzzle;
 }
 
 // ============================================================
