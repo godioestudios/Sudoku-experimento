@@ -138,6 +138,9 @@ export function useSudoku() {
           return { ...previo, notas: nuevasNotas };
         });
       } else {
+        // Si el valor no cambia realmente, evitamos guardar historial y contar errores
+        if (tableroJuego[fila][columna] === numero) return;
+
         guardarHistorial();
         setPartida((previo) => {
           const nuevoTablero = copiarTablero(previo.tableroJuego);
