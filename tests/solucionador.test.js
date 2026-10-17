@@ -5,6 +5,7 @@ import {
   ESTADOS,
   TECNICAS,
   clasificarTablero,
+  detectarHiddenPares,
   detectarHiddenSingles,
   detectarNakedPares,
   detectarNakedSingles,
@@ -591,4 +592,218 @@ test("resolverLogico devuelve bloqueado sin pasos si no hay singles", () => {
 test("los pasos aplicados conservan la unicidad del puzzle", () => {
   const { tablero } = resolverLogico(SE_BLOQUEA_DESPUES);
   assert.equal(contarSoluciones(copiarTablero(tablero), 2), 1);
+});
+
+// ------------------------------------------------------------
+// Hidden pairs
+// ------------------------------------------------------------
+
+// Fila 0: falta {2,3,6}. Los 2 y 3 de la columna 5 bloquean (0,5), así
+// que en la fila 0 los números 2 y 3 solo caben en (0,1) y (0,2). Ambas
+// casillas también admiten el 6, que el par oculto {2,3} elimina.
+const HIDDEN_PAIR_FILA = [
+  [1, 0, 0, 4, 5, 0, 7, 8, 9],
+  [0, 0, 0, 0, 0, 2, 0, 0, 0],
+  [0, 0, 0, 0, 0, 3, 0, 0, 0],
+  [0, 0, 0, 0, 0, 0, 0, 0, 0],
+  [0, 0, 0, 0, 0, 0, 0, 0, 0],
+  [0, 0, 0, 0, 0, 0, 0, 0, 0],
+  [0, 0, 0, 0, 0, 0, 0, 0, 0],
+  [0, 0, 0, 0, 0, 0, 0, 0, 0],
+  [0, 0, 0, 0, 0, 0, 0, 0, 0],
+];
+
+// Columna 0: falta {2,3,8}. Los 2 y 3 de la fila 7 bloquean (7,0), así
+// que en la columna 0 los 2 y 3 solo caben en (1,0) y (2,0). El par
+// oculto {2,3} elimina el 8 de ambas casillas.
+const HIDDEN_PAIR_COLUMNA = [
+  [1, 0, 0, 0, 0, 0, 0, 0, 0],
+  [0, 0, 0, 0, 0, 0, 0, 0, 0],
+  [0, 0, 0, 0, 0, 0, 0, 0, 0],
+  [4, 0, 0, 0, 0, 0, 0, 0, 0],
+  [5, 0, 0, 0, 0, 0, 0, 0, 0],
+  [6, 0, 0, 0, 0, 0, 0, 0, 0],
+  [7, 0, 0, 0, 0, 0, 0, 0, 0],
+  [0, 2, 3, 0, 0, 0, 0, 0, 0],
+  [9, 0, 0, 0, 0, 0, 0, 0, 0],
+];
+
+// Caja 0: los números 2 y 3 solo caben en (1,0) y (2,0). El par oculto
+// {2,3} elimina el 6 de ambas casillas.
+const HIDDEN_PAIR_CAJA = [
+  [7, 0, 1, 2, 3, 0, 0, 0, 0],
+  [0, 4, 5, 0, 0, 0, 0, 0, 0],
+  [0, 8, 9, 0, 0, 0, 0, 0, 0],
+  [0, 2, 0, 0, 0, 0, 0, 0, 0],
+  [0, 3, 0, 0, 0, 0, 0, 0, 0],
+  [0, 0, 0, 0, 0, 0, 0, 0, 0],
+  [0, 0, 0, 0, 0, 0, 0, 0, 0],
+  [0, 0, 0, 0, 0, 0, 0, 0, 0],
+  [0, 0, 0, 0, 0, 0, 0, 0, 0],
+];
+
+// Fila 0: (0,1) y (0,2) ya tienen exactamente {2,3}, sin candidatos
+// extraños, así que el par oculto {2,3} no elimina nada.
+const HIDDEN_PAIR_SIN_ELIMINAR = [
+  [1, 0, 0, 4, 5, 6, 7, 8, 9],
+  [0, 0, 0, 0, 0, 0, 0, 0, 0],
+  [0, 0, 0, 0, 0, 0, 0, 0, 0],
+  [0, 0, 0, 0, 0, 0, 0, 0, 0],
+  [0, 0, 0, 0, 0, 0, 0, 0, 0],
+  [0, 0, 0, 0, 0, 0, 0, 0, 0],
+  [0, 0, 0, 0, 0, 0, 0, 0, 0],
+  [0, 0, 0, 0, 0, 0, 0, 0, 0],
+  [0, 0, 0, 0, 0, 0, 0, 0, 0],
+];
+
+// Tablero con casillas vacías pero sin ningún par oculto.
+const SIN_PARES_OCULTOS = [
+  [5, 0, 4, 6, 7, 8, 9, 1, 2],
+  [6, 7, 2, 0, 9, 5, 0, 4, 8],
+  [0, 9, 8, 3, 4, 2, 5, 6, 7],
+  [8, 5, 9, 0, 6, 1, 4, 2, 3],
+  [4, 2, 6, 0, 0, 3, 0, 9, 1],
+  [7, 1, 3, 9, 0, 4, 8, 0, 6],
+  [9, 6, 1, 5, 3, 0, 2, 0, 4],
+  [2, 8, 0, 0, 1, 9, 6, 3, 5],
+  [3, 4, 5, 2, 8, 0, 1, 7, 9],
+];
+
+// Dos pares ocultos en cruz sobre (0,1): uno en la fila 0 ({3,7}) y otro
+// en la columna 1 ({3,9}). Sus eliminaciones combinadas dejan a (0,1)
+// con un único candidato, el 3.
+const HIDDEN_PARES_EN_CRUZ = [
+  [5, 0, 4, 6, 0, 0, 0, 0, 2],
+  [6, 0, 2, 0, 9, 5, 3, 0, 8],
+  [0, 0, 0, 0, 4, 0, 0, 6, 7],
+  [0, 0, 9, 7, 0, 1, 4, 2, 0],
+  [4, 0, 6, 8, 0, 3, 7, 0, 0],
+  [0, 0, 3, 0, 0, 0, 0, 0, 6],
+  [9, 0, 0, 5, 0, 7, 2, 8, 4],
+  [2, 8, 7, 0, 1, 0, 6, 0, 5],
+  [3, 0, 5, 0, 8, 0, 0, 0, 0],
+];
+
+test("detectarHiddenPares encuentra un par oculto en una fila", () => {
+  const pares = detectarHiddenPares(HIDDEN_PAIR_FILA);
+  const par = pares.find(
+    (p) =>
+      p.unidad === "fila" &&
+      p.candidatos.join(",") === "2,3" &&
+      p.celdas.some(([fila, columna]) => fila === 0 && columna === 1)
+  );
+
+  assert.ok(par);
+  assert.equal(par.tecnica, TECNICAS.HIDDEN_PAIR);
+  assert.deepEqual(par.celdas, [
+    [0, 1],
+    [0, 2],
+  ]);
+  assert.deepEqual(par.eliminados, [
+    [0, 1, 6],
+    [0, 2, 6],
+  ]);
+});
+
+test("detectarHiddenPares encuentra un par oculto en una columna", () => {
+  const pares = detectarHiddenPares(HIDDEN_PAIR_COLUMNA);
+  const par = pares.find(
+    (p) => p.unidad === "columna" && p.candidatos.join(",") === "2,3"
+  );
+
+  assert.ok(par);
+  assert.deepEqual(par.celdas, [
+    [1, 0],
+    [2, 0],
+  ]);
+  assert.deepEqual(par.eliminados, [
+    [1, 0, 8],
+    [2, 0, 8],
+  ]);
+});
+
+test("detectarHiddenPares encuentra un par oculto en una caja", () => {
+  const pares = detectarHiddenPares(HIDDEN_PAIR_CAJA);
+  const par = pares.find(
+    (p) => p.unidad === "caja" && p.candidatos.join(",") === "2,3"
+  );
+
+  assert.ok(par);
+  assert.deepEqual(par.celdas, [
+    [1, 0],
+    [2, 0],
+  ]);
+  assert.deepEqual(par.eliminados, [
+    [1, 0, 6],
+    [2, 0, 6],
+  ]);
+});
+
+test("detectarHiddenPares no encuentra nada sin pares ocultos", () => {
+  assert.deepEqual(detectarHiddenPares(SIN_PARES_OCULTOS), []);
+});
+
+test("un par oculto sin eliminaciones no es un paso efectivo", () => {
+  const pares = detectarHiddenPares(HIDDEN_PAIR_SIN_ELIMINAR);
+  const par = pares.find(
+    (p) => p.unidad === "fila" && p.celdas.some(([fila, columna]) => fila === 0 && columna === 1)
+  );
+
+  // El par se detecta, pero no descarta ningún candidato...
+  assert.ok(par);
+  assert.deepEqual(par.eliminados, []);
+  // ...así que ninguno de los pares detectados sería un paso efectivo.
+  assert.equal(pares.some((p) => p.eliminados.length > 0), false);
+});
+
+test("los pares ocultos en cruz habilitan un naked single", () => {
+  // (0,1) empieza con cuatro candidatos: no es naked single.
+  assert.deepEqual(obtenerCandidatos(HIDDEN_PARES_EN_CRUZ, 0, 1), [1, 3, 7, 9]);
+  assert.ok(
+    !detectarNakedSingles(HIDDEN_PARES_EN_CRUZ).some(
+      (s) => s.fila === 0 && s.columna === 1
+    )
+  );
+
+  const pares = detectarHiddenPares(HIDDEN_PARES_EN_CRUZ);
+  const deFila = pares.find(
+    (p) => p.unidad === "fila" && p.celdas.some(([f, c]) => f === 0 && c === 1)
+  );
+  const deColumna = pares.find(
+    (p) => p.unidad === "columna" && p.celdas.some(([f, c]) => f === 0 && c === 1)
+  );
+  assert.ok(deFila);
+  assert.ok(deColumna);
+
+  const eliminados = new Set(
+    [...deFila.eliminados, ...deColumna.eliminados].map(
+      ([fila, columna, numero]) => `${fila},${columna},${numero}`
+    )
+  );
+  const singles = detectarNakedSingles(HIDDEN_PARES_EN_CRUZ, eliminados);
+  assert.ok(
+    singles.some((s) => s.fila === 0 && s.columna === 1 && s.numero === 3)
+  );
+});
+
+test("detectarHiddenPares respeta eliminaciones previas y evita duplicarlas", () => {
+  // Ya se descartó el 6 de (0,1): el par oculto sigue detectándose, pero
+  // solo registra el 6 de (0,2), sin repetir el de (0,1).
+  const previos = new Set(["0,1,6"]);
+  const pares = detectarHiddenPares(HIDDEN_PAIR_FILA, previos);
+  const par = pares.find(
+    (p) =>
+      p.unidad === "fila" &&
+      p.candidatos.join(",") === "2,3" &&
+      p.celdas.some(([fila, columna]) => fila === 0 && columna === 1)
+  );
+
+  assert.ok(par);
+  assert.deepEqual(par.eliminados, [[0, 2, 6]]);
+});
+
+test("detectarHiddenPares no modifica el tablero original", () => {
+  const original = copiarTablero(HIDDEN_PAIR_FILA);
+  detectarHiddenPares(HIDDEN_PAIR_FILA);
+  assert.deepEqual(HIDDEN_PAIR_FILA, original);
 });

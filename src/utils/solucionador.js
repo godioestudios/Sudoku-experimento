@@ -23,6 +23,7 @@ export const TECNICAS = {
   NAKED_SINGLE: "naked-single",
   HIDDEN_SINGLE: "hidden-single",
   NAKED_PAIR: "naked-pair",
+  HIDDEN_PAIR: "hidden-pair",
 };
 
 // Estados posibles de un tablero según las técnicas disponibles
@@ -272,6 +273,89 @@ export function detectarNakedPares(tablero, eliminados = null) {
             [b.fila, b.columna],
           ],
           candidatos: [...candidatos],
+          eliminados: descartes,
+        });
+      }
+    }
+  }
+
+  return pares;
+}
+
+/**
+ * Pares ocultos: dos números distintos que, dentro de una misma fila,
+ * columna o caja 3×3, pueden colocarse únicamente en las mismas dos
+ * casillas vacías. En esas dos casillas, se eliminan todos los candidatos
+ * distintos de los dos números del par.
+ *
+ * No coloca ningún número: solo elimina candidatos.
+ *
+ * @param {Set<string>} [eliminados] - Candidatos descartados por otras técnicas
+ * @returns {{
+ *   tecnica: string,
+ *   unidad: string,
+ *   celdas: [number, number][],
+ *   candidatos: number[],
+ *   eliminados: [number, number, number][]
+ * }[]}
+ */
+export function detectarHiddenPares(tablero, eliminados = null) {
+  const pares = [];
+
+  for (const { tipo, celdas } of UNIDADES) {
+    // Candidatos de todas las casillas vacías de la unidad
+    const vacias = celdas
+      .filter(([fila, columna]) => tablero[fila][columna] === 0)
+      .map(([fila, columna]) => ({
+        fila,
+        columna,
+        candidatos: candidatosDe(tablero, fila, columna, eliminados),
+      }));
+
+    if (vacias.length < 2) continue;
+
+    // Para cada par de números, ¿solo pueden ir en las mismas dos casillas?
+    for (let n1 = 1; n1 <= TAMAÑO; n1++) {
+      const conN1 = vacias.filter((celda) => celda.candidatos.includes(n1));
+      if (conN1.length !== 2) continue;
+
+      for (let n2 = n1 + 1; n2 <= TAMAÑO; n2++) {
+        const conN2 = vacias.filter((celda) => celda.candidatos.includes(n2));
+        if (conN2.length !== 2) continue;
+
+        // Deben ser exactamente las mismas dos casillas
+        const [a, b] = conN1;
+        const [c, d] = conN2;
+        const mismas =
+          (a.fila === c.fila &&
+            a.columna === c.columna &&
+            b.fila === d.fila &&
+            b.columna === d.columna) ||
+          (a.fila === d.fila &&
+            a.columna === d.columna &&
+            b.fila === c.fila &&
+            b.columna === c.columna);
+        if (!mismas) continue;
+
+        // En esas dos casillas, descartar todo candidato que no sea
+        // uno de los dos números del par
+        const descartes = [];
+        for (const celda of [a, b]) {
+          for (const numero of celda.candidatos) {
+            if (numero !== n1 && numero !== n2) {
+              descartes.push([celda.fila, celda.columna, numero]);
+            }
+          }
+        }
+
+        pares.push({
+          tecnica: TECNICAS.HIDDEN_PAIR,
+          unidad: tipo,
+          celdas: [
+            [a.fila, a.columna],
+            [b.fila, b.columna],
+          ],
+          candidatos: [n1, n2],
           eliminados: descartes,
         });
       }
