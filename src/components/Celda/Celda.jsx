@@ -31,7 +31,7 @@ export default function Celda({
     if (seleccionada) clases.push("seleccionada");
 
     const enArea = (() => {
-      if (!seleccion || valorSeleccionado === 0) return false;
+      if (!seleccion) return false;
       const mismaFila = fila === seleccion.fila;
       const mismaColumna = columna === seleccion.columna;
       const mismaCaja =
