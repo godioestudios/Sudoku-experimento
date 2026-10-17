@@ -22,6 +22,7 @@ import {
 export const TECNICAS = {
   NAKED_SINGLE: "naked-single",
   HIDDEN_SINGLE: "hidden-single",
+  NAKED_PAIR: "naked-pair",
 };
 
 // Estados posibles de un tablero según las técnicas disponibles
@@ -45,15 +46,28 @@ export function obtenerCandidatos(tablero, fila, columna) {
 }
 
 /**
+ * Candidatos de una casilla descontando las eliminaciones registradas
+ * por técnicas que NO colocan números (naked pairs). `eliminados` es un
+ * Set de claves "fila,columna,numero"; si es null no se descuenta nada.
+ */
+function candidatosDe(tablero, fila, columna, eliminados) {
+  const base = obtenerCandidatos(tablero, fila, columna);
+  if (!eliminados || eliminados.size === 0 || base.length === 0) return base;
+  return base.filter((numero) => !eliminados.has(`${fila},${columna},${numero}`));
+}
+
+/**
  * Casillas vacías con un único candidato (naked single).
+ * @param {Set<string>} [eliminados] - Candidatos descartados por otras
+ *   técnicas; se descuentan al calcular los candidatos.
  * @returns {{fila: number, columna: number, numero: number, tecnica: string}[]}
  */
-export function detectarNakedSingles(tablero) {
+export function detectarNakedSingles(tablero, eliminados = null) {
   const singles = [];
   for (let fila = 0; fila < TAMAÑO; fila++) {
     for (let columna = 0; columna < TAMAÑO; columna++) {
       if (tablero[fila][columna] !== 0) continue;
-      const candidatos = obtenerCandidatos(tablero, fila, columna);
+      const candidatos = candidatosDe(tablero, fila, columna, eliminados);
       if (candidatos.length === 1) {
         singles.push({
           fila,
@@ -139,11 +153,13 @@ export function tableroEsValido(tablero) {
  * Detecta casillas vacías sin ningún candidato: el tablero no
  * tiene solución aunque no haya números repetidos.
  */
-function hayCasillaSinCandidatos(tablero) {
+function hayCasillaSinCandidatos(tablero, eliminados = null) {
   for (let fila = 0; fila < TAMAÑO; fila++) {
     for (let columna = 0; columna < TAMAÑO; columna++) {
       if (tablero[fila][columna] !== 0) continue;
-      if (obtenerCandidatos(tablero, fila, columna).length === 0) return true;
+      if (candidatosDe(tablero, fila, columna, eliminados).length === 0) {
+        return true;
+      }
     }
   }
   return false;
@@ -156,9 +172,11 @@ function hayCasillaSinCandidatos(tablero) {
  * naked sigue siendo destino posible de otros números y excluiría
  * colocaciones reales. Si la misma casilla es hidden single en más
  * de una unidad se registra una sola vez.
+ * @param {Set<string>} [eliminados] - Candidatos descartados por otras
+ *   técnicas; se descuentan al calcular los candidatos.
  * @returns {{fila: number, columna: number, numero: number, tecnica: string, unidad: string}[]}
  */
-export function detectarHiddenSingles(tablero) {
+export function detectarHiddenSingles(tablero, eliminados = null) {
   const singles = [];
   const registrados = new Set();
 
@@ -167,7 +185,7 @@ export function detectarHiddenSingles(tablero) {
       const posibles = celdas.filter(
         ([fila, columna]) =>
           tablero[fila][columna] === 0 &&
-          esValido(tablero, fila, columna, numero)
+          candidatosDe(tablero, fila, columna, eliminados).includes(numero)
       );
       if (posibles.length !== 1) continue;
 
@@ -190,14 +208,115 @@ export function detectarHiddenSingles(tablero) {
 }
 
 /**
- * Estado del tablero según las técnicas disponibles:
+ * Pares desnudos: dos casillas vacías de una misma fila, columna o
+ * caja cuyos candidatos son exactamente los mismos dos números. Esos
+ * dos números quedan "reservados" a esas dos casillas, por lo que se
+ * eliminan del resto de casillas de la unidad.
+ *
+ * No coloca ningún número: solo elimina candidatos.
+ *
+ * @param {Set<string>} [eliminados] - Candidatos descartados por otras
+ *   técnicas; se descuentan al calcular los candidatos.
+ * @returns {{
+ *   tecnica: string,
+ *   unidad: string,
+ *   celdas: [number, number][],
+ *   candidatos: number[],
+ *   eliminados: [number, number, number][]
+ * }[]} Cada par detectado. `eliminados` puede quedar vacío si el par
+ *   no descarta ningún candidato de la unidad.
+ */
+export function detectarNakedPares(tablero, eliminados = null) {
+  const pares = [];
+
+  for (const { tipo, celdas } of UNIDADES) {
+    // Candidatos de todas las casillas vacías de la unidad
+    const vacias = celdas
+      .filter(([fila, columna]) => tablero[fila][columna] === 0)
+      .map(([fila, columna]) => ({
+        fila,
+        columna,
+        candidatos: candidatosDe(tablero, fila, columna, eliminados),
+      }));
+
+    // Solo pueden formar par las casillas con exactamente dos candidatos
+    const bicelda = vacias.filter((celda) => celda.candidatos.length === 2);
+
+    for (let i = 0; i < bicelda.length; i++) {
+      for (let j = i + 1; j < bicelda.length; j++) {
+        const a = bicelda[i];
+        const b = bicelda[j];
+        if (
+          a.candidatos[0] !== b.candidatos[0] ||
+          a.candidatos[1] !== b.candidatos[1]
+        ) {
+          continue;
+        }
+
+        const candidatos = a.candidatos;
+        const descartes = [];
+        for (const otra of vacias) {
+          if (otra === a || otra === b) continue;
+          for (const numero of candidatos) {
+            if (otra.candidatos.includes(numero)) {
+              descartes.push([otra.fila, otra.columna, numero]);
+            }
+          }
+        }
+
+        pares.push({
+          tecnica: TECNICAS.NAKED_PAIR,
+          unidad: tipo,
+          celdas: [
+            [a.fila, a.columna],
+            [b.fila, b.columna],
+          ],
+          candidatos: [...candidatos],
+          eliminados: descartes,
+        });
+      }
+    }
+  }
+
+  return pares;
+}
+
+/**
+ * Clasificación interna que, a diferencia de clasificarTablero,
+ * descuenta los candidatos ya eliminados (por naked pairs) y tiene en
+ * cuenta si queda algún par desnudo aplicable. Es la que usa
+ * resolverLogico para decidir si aún puede avanzar.
+ */
+function clasificarConEliminaciones(tablero, eliminados) {
+  if (!tableroEsValido(tablero)) return ESTADOS.INVALIDO;
+  if (buscarCasillaVacia(tablero) === null) return ESTADOS.RESUELTO;
+  if (hayCasillaSinCandidatos(tablero, eliminados)) return ESTADOS.INVALIDO;
+  if (detectarNakedSingles(tablero, eliminados).length > 0) {
+    return ESTADOS.RESOLUBLE;
+  }
+  if (detectarHiddenSingles(tablero, eliminados).length > 0) {
+    return ESTADOS.RESOLUBLE;
+  }
+  const pares = detectarNakedPares(tablero, eliminados);
+  if (pares.some((par) => par.eliminados.length > 0)) {
+    return ESTADOS.RESOLUBLE;
+  }
+  return ESTADOS.BLOQUEADO;
+}
+
+/**
+ * Estado del tablero según las técnicas de single disponibles:
  * - "invalido":   incumple las reglas (repetidos, valores fuera de
  *                 rango, estructura) o tiene una casilla vacía sin
  *                 candidatos, así que no tiene solución posible.
  * - "resuelto":   completo y sin números repetidos.
  * - "resoluble":  al menos un single (naked u hidden) se puede aplicar.
- * - "bloqueado":  quedan vacías pero ninguna técnica básica aplica;
- *                 hace falta búsqueda o técnicas avanzadas.
+ * - "bloqueado":  quedan vacías pero ningún single aplica.
+ *
+ * Es una clasificación basada solo en el tablero (sin estado de
+ * candidatos eliminados), por lo que los naked pairs no la alteran:
+ * esa técnica se aplica en resolverLogico, que sí conserva las
+ * eliminaciones entre iteraciones.
  */
 export function clasificarTablero(tablero) {
   if (!tableroEsValido(tablero)) return ESTADOS.INVALIDO;
@@ -209,33 +328,63 @@ export function clasificarTablero(tablero) {
 }
 
 /**
- * Aplica singles hasta que no quede ninguna técnica disponible.
- * Prefiere naked singles; si no hay, aplica uno hidden single.
- * Recalcula los candidatos tras cada colocación, de modo que cada
- * paso se valida contra el tablero actual: nunca coloca un número
- * que rompa las reglas. Si el tablero de entrada es inválido o
- * contradictorio no aplica ningún paso.
+ * Aplica técnicas hasta que no quede ninguna disponible. Prioridad:
+ * naked singles, hidden singles y, si no hay singles, naked pairs
+ * (que eliminan candidatos y pueden habilitar nuevos singles).
+ * Recalcula los candidatos tras cada deducción, de modo que cada paso
+ * se valida contra el tablero actual: nunca coloca un número que rompa
+ * las reglas. Si el tablero de entrada es inválido o contradictorio no
+ * aplica ningún paso.
+ *
+ * Los naked pairs no colocan números: solo registran candidatos
+ * eliminados, que se conservan entre iteraciones para que los singles
+ * habilitados por una eliminación se detecten después.
  *
  * El tablero recibido NUNCA se modifica: se trabaja sobre una copia.
  *
  * @param {number[][]} tablero
  * @returns {{estado: string, pasos: object[], tablero: number[][]}}
  *   estado: "resuelto" | "bloqueado" | "invalido"; pasos: técnica
- *   aplicada y número colocado en cada iteración, en orden.
+ *   aplicada en cada iteración, en orden (los singles colocan un
+ *   número; los naked pairs registran candidatos eliminados).
  */
 export function resolverLogico(tablero) {
   const copia = copiarTablero(tablero);
   const pasos = [];
+  const eliminados = new Set();
 
-  let estado = clasificarTablero(copia);
+  let estado = clasificarConEliminaciones(copia, eliminados);
   while (estado === ESTADOS.RESOLUBLE) {
-    const naked = detectarNakedSingles(copia);
-    const aplicables = naked.length > 0 ? naked : detectarHiddenSingles(copia);
-    const paso = aplicables[0];
+    const naked = detectarNakedSingles(copia, eliminados);
 
-    copia[paso.fila][paso.columna] = paso.numero;
-    pasos.push(paso);
-    estado = clasificarTablero(copia);
+    if (naked.length > 0) {
+      const paso = naked[0];
+      copia[paso.fila][paso.columna] = paso.numero;
+      pasos.push(paso);
+    } else {
+      const hidden = detectarHiddenSingles(copia, eliminados);
+
+      if (hidden.length > 0) {
+        const paso = hidden[0];
+        copia[paso.fila][paso.columna] = paso.numero;
+        pasos.push(paso);
+      } else {
+        // Sin singles: aplicar un par desnudo que elimine candidatos.
+        // Si no existe ninguno, la clasificación no habría devuelto
+        // "resoluble" y el bucle ya habría terminado.
+        const par = detectarNakedPares(copia, eliminados).find(
+          (p) => p.eliminados.length > 0
+        );
+        if (!par) break;
+
+        for (const [fila, columna, numero] of par.eliminados) {
+          eliminados.add(`${fila},${columna},${numero}`);
+        }
+        pasos.push(par);
+      }
+    }
+
+    estado = clasificarConEliminaciones(copia, eliminados);
   }
 
   return { estado, pasos, tablero: copia };

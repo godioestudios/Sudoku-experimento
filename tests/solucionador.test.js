@@ -6,6 +6,7 @@ import {
   TECNICAS,
   clasificarTablero,
   detectarHiddenSingles,
+  detectarNakedPares,
   detectarNakedSingles,
   obtenerCandidatos,
   resolverLogico,
@@ -82,6 +83,86 @@ const SOLUCION = [
   [9, 6, 1, 5, 3, 7, 2, 8, 4],
   [2, 8, 7, 4, 1, 9, 6, 3, 5],
   [3, 4, 5, 2, 8, 6, 1, 7, 9],
+];
+
+// ------------------------------------------------------------
+// Fixtures de naked pairs
+// ------------------------------------------------------------
+
+// Puzzle válido de solución única con pares desnudos en fila, columna
+// y caja:
+//   fila    (8,6)-(8,8) = {1,3} → elimina el 1 de (8,4)
+//   columna (0,8)-(8,8) = {1,3} → elimina {1,3} de (5,8) y (7,8)
+//   caja    (4,1)-(5,0) = {2,8} → elimina {2,8} de (5,1)
+const CON_PARES = [
+  [0, 0, 0, 8, 0, 7, 0, 0, 0],
+  [0, 0, 4, 0, 3, 9, 0, 0, 6],
+  [7, 0, 5, 2, 0, 6, 0, 4, 9],
+  [6, 3, 0, 4, 5, 2, 0, 0, 7],
+  [4, 0, 1, 0, 7, 0, 9, 0, 5],
+  [0, 0, 0, 0, 9, 0, 6, 0, 0],
+  [0, 7, 3, 0, 8, 5, 0, 0, 2],
+  [0, 0, 2, 7, 6, 0, 5, 9, 0],
+  [5, 6, 8, 9, 0, 4, 0, 7, 0],
+];
+
+// Tablero donde todos los pares detectados están "aislados": ninguna
+// otra casilla de la unidad comparte sus candidatos, por lo que no
+// eliminan nada.
+const PARES_SIN_ELIMINAR = [
+  [0, 6, 0, 0, 0, 0, 9, 5, 2],
+  [9, 0, 8, 0, 4, 0, 3, 6, 1],
+  [5, 1, 2, 9, 3, 0, 0, 8, 7],
+  [0, 0, 5, 8, 0, 3, 1, 0, 9],
+  [8, 9, 7, 2, 1, 0, 6, 0, 0],
+  [6, 3, 0, 4, 0, 9, 8, 0, 0],
+  [4, 0, 0, 0, 2, 0, 7, 1, 6],
+  [1, 2, 3, 0, 0, 0, 5, 4, 0],
+  [7, 8, 6, 0, 5, 4, 2, 9, 0],
+];
+
+// Tablero donde (5,2) tiene candidatos {1,7}. El par desnudo de la
+// caja 3-5/0-1, celdas (3,1) y (5,1) = {1,2}, elimina el 1 de (5,2),
+// habilitando un naked single 7 que antes no existía.
+const PAR_HABILITA_SINGLE = [
+  [1, 7, 0, 0, 0, 0, 0, 9, 5],
+  [0, 0, 0, 7, 9, 3, 8, 1, 2],
+  [2, 9, 0, 0, 0, 0, 6, 0, 7],
+  [5, 0, 4, 0, 0, 0, 0, 0, 0],
+  [8, 3, 6, 0, 4, 1, 0, 0, 0],
+  [9, 0, 0, 0, 0, 0, 5, 8, 4],
+  [3, 8, 2, 0, 1, 0, 0, 5, 0],
+  [0, 6, 0, 3, 2, 0, 0, 0, 8],
+  [7, 5, 0, 6, 8, 9, 0, 0, 0],
+];
+
+// Estado intermedio de SE_BLOQUEA_DESPUES tras sus 8 singles: no queda
+// ningún single, pero hay pares desnudos aplicables. Al aplicarlos se
+// habilitan los singles que permiten terminarlo.
+const PAR_HABILITA_SINGLES_SIN_SINGLES = [
+  [9, 8, 4, 2, 3, 0, 0, 0, 5],
+  [0, 0, 5, 0, 0, 0, 0, 0, 4],
+  [0, 1, 0, 5, 4, 0, 8, 0, 0],
+  [0, 0, 0, 7, 9, 5, 0, 3, 0],
+  [7, 5, 0, 0, 0, 6, 0, 0, 0],
+  [0, 0, 0, 0, 2, 0, 7, 5, 0],
+  [6, 4, 0, 0, 0, 0, 5, 0, 7],
+  [8, 0, 0, 0, 5, 0, 0, 4, 9],
+  [5, 0, 0, 0, 0, 4, 0, 1, 0],
+];
+
+// Puzzle válido de solución única que se queda bloqueado incluso con
+// naked pairs (usa 1, pero no alcanza para terminar).
+const BLOQUEADO_CON_PASOS = [
+  [3, 0, 6, 1, 0, 0, 4, 0, 5],
+  [0, 0, 2, 0, 0, 0, 0, 0, 7],
+  [7, 1, 0, 5, 9, 0, 0, 0, 3],
+  [6, 0, 0, 7, 0, 1, 0, 0, 0],
+  [0, 0, 0, 0, 0, 0, 7, 0, 0],
+  [0, 5, 0, 0, 0, 0, 0, 3, 0],
+  [0, 0, 0, 0, 2, 5, 8, 7, 0],
+  [0, 0, 5, 0, 8, 7, 9, 1, 4],
+  [0, 0, 0, 6, 1, 9, 0, 5, 0],
 ];
 
 // ------------------------------------------------------------
@@ -196,6 +277,143 @@ test("detectarHiddenSingles no encuentra nada en un puzzle sin singles", () => {
 });
 
 // ------------------------------------------------------------
+// Naked pairs
+// ------------------------------------------------------------
+
+test("detectarNakedPares encuentra pares en fila, columna y caja", () => {
+  const pares = detectarNakedPares(CON_PARES);
+
+  const deFila = pares.find(
+    (p) =>
+      p.tecnica === TECNICAS.NAKED_PAIR &&
+      p.unidad === "fila" &&
+      p.candidatos.join(",") === "1,3"
+  );
+  assert.ok(deFila);
+  assert.deepEqual(deFila.celdas, [
+    [8, 6],
+    [8, 8],
+  ]);
+  assert.ok(
+    deFila.eliminados.some(
+      ([fila, columna, numero]) => fila === 8 && columna === 4 && numero === 1
+    )
+  );
+
+  const deColumna = pares.find(
+    (p) =>
+      p.unidad === "columna" &&
+      p.celdas.some(([f, c]) => f === 0 && c === 8) &&
+      p.celdas.some(([f, c]) => f === 8 && c === 8)
+  );
+  assert.ok(deColumna);
+  assert.deepEqual(deColumna.candidatos, [1, 3]);
+  assert.ok(
+    deColumna.eliminados.some(([f, c, n]) => f === 5 && c === 8 && n === 1)
+  );
+
+  const deCaja = pares.find(
+    (p) =>
+      p.unidad === "caja" &&
+      p.candidatos.join(",") === "2,8" &&
+      p.celdas.some(([f, c]) => f === 5 && c === 0)
+  );
+  assert.ok(deCaja);
+  assert.deepEqual(deCaja.eliminados, [
+    [5, 1, 2],
+    [5, 1, 8],
+  ]);
+});
+
+test("detectarNakedPares no encuentra nada en un puzzle sin pares", () => {
+  assert.deepEqual(detectarNakedPares(SIN_SINGLES), []);
+});
+
+test("detectarNakedPares devuelve el par aunque no elimine candidatos", () => {
+  const pares = detectarNakedPares(PARES_SIN_ELIMINAR);
+
+  // Hay pares detectados, pero ninguno descarta candidatos
+  assert.ok(pares.length > 0);
+  assert.ok(pares.every((p) => p.eliminados.length === 0));
+});
+
+test("una eliminación de par habilita un naked single", () => {
+  // Antes de eliminar, (5,2) tiene dos candidatos y no es naked single
+  assert.deepEqual(obtenerCandidatos(PAR_HABILITA_SINGLE, 5, 2), [1, 7]);
+  assert.ok(
+    !detectarNakedSingles(PAR_HABILITA_SINGLE).some(
+      (s) => s.fila === 5 && s.columna === 2
+    )
+  );
+
+  const par = detectarNakedPares(PAR_HABILITA_SINGLE).find(
+    (p) =>
+      p.unidad === "caja" &&
+      p.candidatos.join(",") === "1,2" &&
+      p.celdas.some(([f, c]) => f === 3 && c === 1)
+  );
+  assert.ok(par);
+  assert.deepEqual(par.eliminados, [[5, 2, 1]]);
+
+  // Tras descontar el candidato eliminado, (5,2) pasa a ser naked single 7
+  const eliminados = new Set(par.eliminados.map(([f, c, n]) => `${f},${c},${n}`));
+  const singles = detectarNakedSingles(PAR_HABILITA_SINGLE, eliminados);
+  assert.ok(
+    singles.some((s) => s.fila === 5 && s.columna === 2 && s.numero === 7)
+  );
+});
+
+test("resolverLogico aplica el par y luego los singles que habilita", () => {
+  // Este estado arranca sin ningún single: la única técnica disponible
+  // es un par desnudo. Debe aplicarlo y después continuar con singles.
+  assert.equal(detectarNakedSingles(PAR_HABILITA_SINGLES_SIN_SINGLES).length, 0);
+  assert.equal(detectarHiddenSingles(PAR_HABILITA_SINGLES_SIN_SINGLES).length, 0);
+
+  const { estado, pasos } = resolverLogico(PAR_HABILITA_SINGLES_SIN_SINGLES);
+
+  assert.equal(estado, ESTADOS.RESUELTO);
+  assert.equal(pasos[0].tecnica, TECNICAS.NAKED_PAIR);
+  assert.ok(
+    pasos.some(
+      (p) =>
+        p.tecnica === TECNICAS.NAKED_SINGLE ||
+        p.tecnica === TECNICAS.HIDDEN_SINGLE
+    )
+  );
+});
+
+test("un par que no elimina candidatos no se registra ni coloca números", () => {
+  const original = copiarTablero(PARES_SIN_ELIMINAR);
+  const { pasos, tablero } = resolverLogico(PARES_SIN_ELIMINAR);
+
+  assert.ok(!pasos.some((p) => p.tecnica === TECNICAS.NAKED_PAIR));
+  assert.deepEqual(PARES_SIN_ELIMINAR, original);
+
+  // Los pasos aplicados siguen siendo colocaciones válidas
+  for (const paso of pasos) {
+    assert.ok(paso.numero >= 1 && paso.numero <= 9);
+  }
+  assert.equal(tableroEsValido(tablero), true);
+});
+
+test("los pasos de naked pair registran unidad, posiciones y eliminados", () => {
+  const { pasos } = resolverLogico(PAR_HABILITA_SINGLES_SIN_SINGLES);
+  const par = pasos.find((p) => p.tecnica === TECNICAS.NAKED_PAIR);
+
+  assert.ok(par);
+  assert.ok(["fila", "columna", "caja"].includes(par.unidad));
+  assert.equal(par.celdas.length, 2);
+  assert.equal(par.candidatos.length, 2);
+  assert.ok(par.eliminados.length > 0);
+  for (const [fila, columna, numero] of par.eliminados) {
+    assert.ok(fila >= 0 && fila < 9 && columna >= 0 && columna < 9);
+    assert.ok(par.candidatos.includes(numero));
+  }
+  // Los pasos de par NO colocan números
+  assert.equal(par.numero, undefined);
+});
+
+// ------------------------------------------------------------
 // Clasificación del tablero
 // ------------------------------------------------------------
 
@@ -286,8 +504,12 @@ test("resolverLogico resuelve por completo un puzzle de solución única", () =>
   assert.equal(tablero.flat().filter((v) => v === 0).length, 0);
   assert.equal(pasos.length, 51); // 81 - 30 pistas iniciales
 
-  // Cada paso registra técnica y número colocado
+  // Cada paso registra su técnica y, si coloca, su número
   for (const paso of pasos) {
+    if (paso.tecnica === TECNICAS.NAKED_PAIR) {
+      assert.equal(paso.numero, undefined);
+      continue;
+    }
     assert.ok(
       paso.tecnica === TECNICAS.NAKED_SINGLE || paso.tecnica === TECNICAS.HIDDEN_SINGLE
     );
@@ -305,6 +527,7 @@ test("cada paso de resolverLogico es válido contra el tablero del momento", () 
   // recalculara los singles, en algún paso esValido fallaría.
   const enJuego = copiarTablero(RESOLUBLE_SINGLES);
   for (const paso of pasos) {
+    if (paso.tecnica === TECNICAS.NAKED_PAIR) continue; // no coloca
     assert.ok(
       esValido(enJuego, paso.fila, paso.columna, paso.numero),
       `paso contradictorio en (${paso.fila},${paso.columna}) = ${paso.numero}`
@@ -316,19 +539,46 @@ test("cada paso de resolverLogico es válido contra el tablero del momento", () 
   assert.equal(tableroEsValido(tablero), true);
 });
 
-test("resolverLogico se bloquea cuando faltan técnicas básicas", () => {
+test("los naked pairs desbloquean un puzzle estancado con singles", () => {
   const original = copiarTablero(SE_BLOQUEA_DESPUES);
   const { estado, pasos, tablero } = resolverLogico(SE_BLOQUEA_DESPUES);
 
+  // Con singles solos este puzzle se detenía; ahora los pares desnudos
+  // habilitan los singles que faltaban y lo terminan.
+  assert.equal(estado, ESTADOS.RESUELTO);
+  assert.equal(tablero.flat().filter((v) => v === 0).length, 0);
+  assert.ok(pasos.some((p) => p.tecnica === TECNICAS.NAKED_PAIR));
+
+  // Justo antes del primer par no había ningún single disponible
+  const indicePar = pasos.findIndex((p) => p.tecnica === TECNICAS.NAKED_PAIR);
+  assert.ok(indicePar > 0);
+  const antes = copiarTablero(SE_BLOQUEA_DESPUES);
+  for (let i = 0; i < indicePar; i++) {
+    const paso = pasos[i];
+    antes[paso.fila][paso.columna] = paso.numero;
+  }
+  assert.equal(detectarNakedSingles(antes).length, 0);
+  assert.equal(detectarHiddenSingles(antes).length, 0);
+  assert.ok(detectarNakedPares(antes).some((p) => p.eliminados.length > 0));
+
+  // El tablero original no se modifica
+  assert.deepEqual(SE_BLOQUEA_DESPUES, original);
+});
+
+test("resolverLogico sigue bloqueado si los pares no alcanzan", () => {
+  const original = copiarTablero(BLOQUEADO_CON_PASOS);
+  const { estado, pasos, tablero } = resolverLogico(BLOQUEADO_CON_PASOS);
+
   assert.equal(estado, ESTADOS.BLOQUEADO);
-  assert.equal(pasos.length, 8);
+  assert.ok(pasos.length > 0);
+  assert.ok(pasos.some((p) => p.tecnica === TECNICAS.NAKED_PAIR));
   assert.ok(tablero.flat().filter((v) => v === 0).length > 0);
   // Al bloquearse ya no queda ningún single disponible
   assert.equal(detectarNakedSingles(tablero).length, 0);
   assert.equal(detectarHiddenSingles(tablero).length, 0);
 
   // El tablero original no se modifica
-  assert.deepEqual(SE_BLOQUEA_DESPUES, original);
+  assert.deepEqual(BLOQUEADO_CON_PASOS, original);
 });
 
 test("resolverLogico devuelve bloqueado sin pasos si no hay singles", () => {
