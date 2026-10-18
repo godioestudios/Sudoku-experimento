@@ -1277,3 +1277,302 @@ test("las eliminaciones de un hidden pair habilitan un single en una iteración 
       pasos[indicePar + 1].tecnica === TECNICAS.HIDDEN_SINGLE
   );
 });
+
+// ------------------------------------------------------------
+// Naked triples integrados en resolverLogico
+// ------------------------------------------------------------
+
+// Puzzle de solución única que se BLOQUEA con singles y pares (naked y
+// ocultos), pero se desbloquea con un naked triple: en la caja 3-5/3-5
+// las casillas (6,5), (7,5) y (8,5) solo combinan {3,4,8}, así que el
+// trío elimina esos números del resto de la caja y habilita un naked
+// single que permite terminar.
+const NAKED_TRIPLE_DESBLOQUEA = [
+  [3, 8, 0, 0, 9, 0, 0, 6, 0],
+  [0, 0, 0, 0, 0, 7, 9, 0, 0],
+  [0, 4, 0, 8, 0, 0, 0, 3, 1],
+  [0, 0, 0, 7, 0, 2, 0, 0, 0],
+  [0, 3, 2, 5, 1, 9, 0, 0, 0],
+  [0, 0, 5, 0, 8, 6, 0, 2, 0],
+  [5, 0, 0, 1, 0, 0, 0, 0, 8],
+  [0, 0, 4, 0, 0, 0, 0, 0, 0],
+  [0, 0, 0, 0, 0, 0, 2, 0, 9],
+];
+
+// Variante con el trío en una fila: (3,6), (3,7) y (3,8) combinan
+// {1,2,8} y la eliminación habilita un naked single en (3,5).
+const NAKED_TRIPLE_FILA_DESBLOQUEA = [
+  [0, 0, 7, 0, 2, 0, 0, 0, 0],
+  [0, 0, 4, 7, 0, 9, 0, 0, 0],
+  [5, 0, 0, 6, 0, 0, 0, 0, 7],
+  [0, 0, 5, 0, 0, 0, 0, 0, 0],
+  [0, 8, 0, 5, 0, 3, 4, 7, 9],
+  [0, 0, 0, 0, 0, 8, 3, 6, 5],
+  [0, 9, 0, 0, 5, 6, 2, 0, 0],
+  [0, 0, 0, 1, 9, 0, 0, 4, 0],
+  [1, 0, 0, 3, 8, 0, 9, 0, 6],
+];
+
+test("un naked triple desbloquea un puzzle que antes quedaba bloqueado", () => {
+  const original = copiarTablero(NAKED_TRIPLE_DESBLOQUEA);
+  assert.equal(contarSoluciones(copiarTablero(NAKED_TRIPLE_DESBLOQUEA), 2), 1);
+
+  const { estado, pasos, tablero } = resolverLogico(NAKED_TRIPLE_DESBLOQUEA);
+
+  assert.equal(estado, ESTADOS.RESUELTO);
+  assert.equal(tablero.flat().filter((v) => v === 0).length, 0);
+
+  const indiceTriple = pasos.findIndex(
+    (p) => p.tecnica === TECNICAS.NAKED_TRIPLE
+  );
+  assert.ok(indiceTriple >= 0);
+
+  // Justo antes del primer naked triple no había ninguna técnica previa
+  // efectiva: ni singles ni pares (desnudos u ocultos) aplicables. Es
+  // decir, con las técnicas anteriores el puzzle se quedaba bloqueado.
+  const { enJuego, eliminados } = estadoAntesDe(
+    NAKED_TRIPLE_DESBLOQUEA,
+    pasos,
+    indiceTriple
+  );
+  assert.equal(detectarNakedSingles(enJuego, eliminados).length, 0);
+  assert.equal(detectarHiddenSingles(enJuego, eliminados).length, 0);
+  assert.equal(
+    detectarNakedPares(enJuego, eliminados).filter(
+      (p) => p.eliminados.length > 0
+    ).length,
+    0
+  );
+  assert.equal(
+    detectarHiddenPares(enJuego, eliminados).filter(
+      (p) => p.eliminados.length > 0
+    ).length,
+    0
+  );
+  // ...pero sí había un naked triple efectivo.
+  assert.ok(
+    detectarNakedTriples(enJuego, eliminados).some(
+      (t) => t.eliminados.length > 0
+    )
+  );
+
+  // El tablero original no se modifica
+  assert.deepEqual(NAKED_TRIPLE_DESBLOQUEA, original);
+});
+
+test("la eliminación de un naked triple habilita un naked single", () => {
+  const { pasos } = resolverLogico(NAKED_TRIPLE_DESBLOQUEA);
+  const indiceTriple = pasos.findIndex(
+    (p) => p.tecnica === TECNICAS.NAKED_TRIPLE
+  );
+  assert.ok(indiceTriple >= 0);
+
+  const { enJuego, eliminados } = estadoAntesDe(
+    NAKED_TRIPLE_DESBLOQUEA,
+    pasos,
+    indiceTriple
+  );
+
+  // Antes de aplicar el trío no hay ningún single...
+  assert.equal(detectarNakedSingles(enJuego, eliminados).length, 0);
+  assert.equal(detectarHiddenSingles(enJuego, eliminados).length, 0);
+
+  // ...y tras descontar sus eliminaciones aparece al menos un naked single.
+  const conEliminaciones = new Set(eliminados);
+  for (const [fila, columna, numero] of pasos[indiceTriple].eliminados) {
+    conEliminaciones.add(`${fila},${columna},${numero}`);
+  }
+  assert.ok(detectarNakedSingles(enJuego, conEliminaciones).length > 0);
+
+  // El solver lo detecta en la iteración siguiente (progreso garantizado)
+  assert.equal(pasos[indiceTriple + 1].tecnica, TECNICAS.NAKED_SINGLE);
+});
+
+test("los pasos con naked triples se reproducen sin contradicciones", () => {
+  const { pasos, tablero } = resolverLogico(NAKED_TRIPLE_DESBLOQUEA);
+
+  const enJuego = copiarTablero(NAKED_TRIPLE_DESBLOQUEA);
+  const eliminados = new Set();
+  let triplesVistos = 0;
+
+  for (const paso of pasos) {
+    if (
+      paso.tecnica === TECNICAS.NAKED_SINGLE ||
+      paso.tecnica === TECNICAS.HIDDEN_SINGLE
+    ) {
+      assert.ok(
+        esValido(enJuego, paso.fila, paso.columna, paso.numero),
+        `paso contradictorio en (${paso.fila},${paso.columna}) = ${paso.numero}`
+      );
+      enJuego[paso.fila][paso.columna] = paso.numero;
+      continue;
+    }
+
+    // Técnicas de eliminación: no colocan número y eliminan candidatos
+    // que todavía estaban presentes.
+    assert.equal(paso.numero, undefined);
+    assert.ok(paso.eliminados.length > 0);
+
+    if (paso.tecnica === TECNICAS.NAKED_TRIPLE) {
+      triplesVistos++;
+      assert.equal(paso.celdas.length, 3);
+      assert.equal(paso.candidatos.length, 3);
+    } else {
+      assert.equal(paso.celdas.length, 2);
+      assert.equal(paso.candidatos.length, 2);
+    }
+
+    for (const [fila, columna, numero] of paso.eliminados) {
+      const clave = `${fila},${columna},${numero}`;
+      const candidatos = obtenerCandidatos(enJuego, fila, columna).filter(
+        (n) => !eliminados.has(`${fila},${columna},${n}`)
+      );
+      assert.ok(candidatos.includes(numero), `eliminación inexistente ${clave}`);
+
+      if (paso.tecnica === TECNICAS.HIDDEN_PAIR) {
+        assert.ok(!paso.candidatos.includes(numero));
+        assert.ok(paso.celdas.some(([f, c]) => f === fila && c === columna));
+      } else {
+        // Naked pair y naked triple: lo eliminado SON sus números y la
+        // casilla afectada NO pertenece a la técnica.
+        assert.ok(paso.candidatos.includes(numero));
+        assert.ok(!paso.celdas.some(([f, c]) => f === fila && c === columna));
+      }
+
+      eliminados.add(clave);
+    }
+  }
+
+  assert.ok(triplesVistos > 0);
+  assert.deepEqual(enJuego, tablero);
+  assert.equal(tableroEsValido(tablero), true);
+});
+
+test("resolverLogico registra naked triples sin colocar números ni eliminar de más", () => {
+  const { pasos } = resolverLogico(NAKED_TRIPLE_DESBLOQUEA);
+  const triples = pasos.filter((p) => p.tecnica === TECNICAS.NAKED_TRIPLE);
+
+  assert.ok(triples.length > 0);
+  for (const triple of triples) {
+    assert.equal(triple.numero, undefined);
+    assert.equal(triple.celdas.length, 3);
+    assert.equal(triple.candidatos.length, 3);
+    assert.ok(triple.eliminados.length > 0);
+    assert.ok(["fila", "columna", "caja"].includes(triple.unidad));
+  }
+});
+
+test("las técnicas conservan su prioridad también con naked triples", () => {
+  const fixtures = [
+    NAKED_TRIPLE_DESBLOQUEA,
+    NAKED_TRIPLE_FILA_DESBLOQUEA,
+    HIDDEN_PAIR_DESBLOQUEA,
+    SE_BLOQUEA_DESPUES,
+    PAR_HABILITA_SINGLES_SIN_SINGLES,
+    RESOLUBLE_SINGLES,
+  ];
+
+  let triplesVistos = 0;
+
+  for (const fixture of fixtures) {
+    const { pasos } = resolverLogico(fixture);
+    const enJuego = copiarTablero(fixture);
+    const eliminados = new Set();
+
+    for (const paso of pasos) {
+      // Un hidden single solo se aplica cuando no hay naked singles
+      if (paso.tecnica === TECNICAS.HIDDEN_SINGLE) {
+        assert.equal(detectarNakedSingles(enJuego, eliminados).length, 0);
+      }
+
+      if (paso.eliminados) {
+        // Antes de cualquier técnica de eliminación no debe quedar single
+        assert.equal(detectarNakedSingles(enJuego, eliminados).length, 0);
+        assert.equal(detectarHiddenSingles(enJuego, eliminados).length, 0);
+
+        // Ni un naked pair efectivo, salvo que el paso sea uno
+        if (paso.tecnica !== TECNICAS.NAKED_PAIR) {
+          assert.equal(
+            detectarNakedPares(enJuego, eliminados).filter(
+              (p) => p.eliminados.length > 0
+            ).length,
+            0
+          );
+        }
+
+        // Un hidden pair solo se aplica si antes no hay naked pairs
+        // efectivos ni, para el naked triple, tampoco hidden pairs.
+        if (paso.tecnica === TECNICAS.HIDDEN_PAIR) {
+          assert.equal(
+            detectarNakedPares(enJuego, eliminados).filter(
+              (p) => p.eliminados.length > 0
+            ).length,
+            0
+          );
+        }
+        if (paso.tecnica === TECNICAS.NAKED_TRIPLE) {
+          triplesVistos++;
+          assert.equal(
+            detectarNakedPares(enJuego, eliminados).filter(
+              (p) => p.eliminados.length > 0
+            ).length,
+            0
+          );
+          assert.equal(
+            detectarHiddenPares(enJuego, eliminados).filter(
+              (p) => p.eliminados.length > 0
+            ).length,
+            0
+          );
+        }
+
+        for (const [fila, columna, numero] of paso.eliminados) {
+          eliminados.add(`${fila},${columna},${numero}`);
+        }
+      } else {
+        enJuego[paso.fila][paso.columna] = paso.numero;
+      }
+    }
+  }
+
+  // Los tríos retrasados se ejercieron en la reproducción de prioridad
+  assert.ok(triplesVistos > 0);
+});
+
+test("un naked triple en fila también desbloquea y habilita un naked single", () => {
+  const original = copiarTablero(NAKED_TRIPLE_FILA_DESBLOQUEA);
+  assert.equal(contarSoluciones(copiarTablero(NAKED_TRIPLE_FILA_DESBLOQUEA), 2), 1);
+
+  const { estado, pasos, tablero } = resolverLogico(NAKED_TRIPLE_FILA_DESBLOQUEA);
+  assert.equal(estado, ESTADOS.RESUELTO);
+  assert.equal(tablero.flat().filter((v) => v === 0).length, 0);
+
+  const indiceTriple = pasos.findIndex(
+    (p) => p.tecnica === TECNICAS.NAKED_TRIPLE
+  );
+  assert.ok(indiceTriple >= 0);
+  assert.equal(pasos[indiceTriple].unidad, "fila");
+  assert.equal(pasos[indiceTriple + 1].tecnica, TECNICAS.NAKED_SINGLE);
+
+  const { enJuego, eliminados } = estadoAntesDe(
+    NAKED_TRIPLE_FILA_DESBLOQUEA,
+    pasos,
+    indiceTriple
+  );
+  assert.equal(detectarNakedSingles(enJuego, eliminados).length, 0);
+  assert.equal(detectarHiddenSingles(enJuego, eliminados).length, 0);
+  assert.equal(
+    detectarNakedPares(enJuego, eliminados).filter(
+      (p) => p.eliminados.length > 0
+    ).length,
+    0
+  );
+  assert.equal(
+    detectarHiddenPares(enJuego, eliminados).filter(
+      (p) => p.eliminados.length > 0
+    ).length,
+    0
+  );
+
+  assert.deepEqual(NAKED_TRIPLE_FILA_DESBLOQUEA, original);
+});

@@ -445,9 +445,10 @@ export function detectarHiddenPares(tablero, eliminados = null) {
 
 /**
  * Clasificación interna que, a diferencia de clasificarTablero,
- * descuenta los candidatos ya eliminados (por naked/hidden pairs) y
- * tiene en cuenta si queda algún par aplicable. Es la que usa
- * resolverLogico para decidir si aún puede avanzar.
+ * descuenta los candidatos ya eliminados (por naked/hidden pairs y
+ * naked triples) y tiene en cuenta si queda alguna técnica de
+ * eliminación aplicable. Es la que usa resolverLogico para decidir si
+ * aún puede avanzar.
  */
 function clasificarConEliminaciones(tablero, eliminados) {
   if (!tableroEsValido(tablero)) return ESTADOS.INVALIDO;
@@ -465,6 +466,10 @@ function clasificarConEliminaciones(tablero, eliminados) {
   }
   const paresOcultos = detectarHiddenPares(tablero, eliminados);
   if (paresOcultos.some((par) => par.eliminados.length > 0)) {
+    return ESTADOS.RESOLUBLE;
+  }
+  const triples = detectarNakedTriples(tablero, eliminados);
+  if (triples.some((triple) => triple.eliminados.length > 0)) {
     return ESTADOS.RESOLUBLE;
   }
   return ESTADOS.BLOQUEADO;
@@ -495,18 +500,20 @@ export function clasificarTablero(tablero) {
 
 /**
  * Aplica técnicas hasta que no quede ninguna disponible. Prioridad:
- * naked singles, hidden singles y, si no hay singles, naked pairs y
- * luego hidden pairs (que eliminan candidatos y pueden habilitar
- * nuevos singles). Recalcula los candidatos tras cada deducción, de
- * modo que cada paso se valida contra el tablero actual: nunca coloca
- * un número que rompa las reglas. Si el tablero de entrada es inválido
- * o contradictorio no aplica ningún paso.
+ * naked singles, hidden singles y, si no hay singles, naked pairs,
+ * luego hidden pairs y por último naked triples (las técnicas de
+ * eliminación quitan candidatos y pueden habilitar nuevos singles).
+ * Recalcula los candidatos tras cada deducción, de modo que cada paso
+ * se valida contra el tablero actual: nunca coloca un número que rompa
+ * las reglas. Si el tablero de entrada es inválido o contradictorio no
+ * aplica ningún paso.
  *
- * Se aplica UNA sola deducción por iteración. Los pares no colocan
- * números: solo registran candidatos eliminados, que se conservan
- * entre iteraciones para que los singles habilitados por una
- * eliminación se detecten en una iteración posterior. Nunca se
- * registra un par cuyas eliminaciones no cambien nada.
+ * Se aplica UNA sola deducción por iteración. Las técnicas de
+ * eliminación no colocan números: solo registran candidatos
+ * eliminados, que se conservan entre iteraciones para que los singles
+ * habilitados por una eliminación se detecten en una iteración
+ * posterior. Nunca se registra una técnica cuyas eliminaciones no
+ * cambien nada.
  *
  * El tablero recibido NUNCA se modifica: se trabaja sobre una copia.
  *
@@ -514,7 +521,7 @@ export function clasificarTablero(tablero) {
  * @returns {{estado: string, pasos: object[], tablero: number[][]}}
  *   estado: "resuelto" | "bloqueado" | "invalido"; pasos: técnica
  *   aplicada en cada iteración, en orden (los singles colocan un
- *   número; los pares registran candidatos eliminados).
+ *   número; los pares y tríos registran candidatos eliminados).
  */
 export function resolverLogico(tablero) {
   const copia = copiarTablero(tablero);
@@ -537,24 +544,29 @@ export function resolverLogico(tablero) {
         copia[paso.fila][paso.columna] = paso.numero;
         pasos.push(paso);
       } else {
-        // Sin singles: aplicar un par que elimine candidatos, con la
-        // prioridad naked → hidden. Si ninguno es efectivo, la
-        // clasificación no habría devuelto "resoluble" y el bucle ya
-        // habría terminado.
-        let par = detectarNakedPares(copia, eliminados).find(
+        // Sin singles: aplicar la técnica de eliminación efectiva de
+        // mayor prioridad (naked pair → hidden pair → naked triple).
+        // Si ninguna elimina candidatos, la clasificación no habría
+        // devuelto "resoluble" y el bucle ya habría terminado.
+        let deduccion = detectarNakedPares(copia, eliminados).find(
           (p) => p.eliminados.length > 0
         );
-        if (!par) {
-          par = detectarHiddenPares(copia, eliminados).find(
+        if (!deduccion) {
+          deduccion = detectarHiddenPares(copia, eliminados).find(
             (p) => p.eliminados.length > 0
           );
         }
-        if (!par) break;
+        if (!deduccion) {
+          deduccion = detectarNakedTriples(copia, eliminados).find(
+            (t) => t.eliminados.length > 0
+          );
+        }
+        if (!deduccion) break;
 
-        for (const [fila, columna, numero] of par.eliminados) {
+        for (const [fila, columna, numero] of deduccion.eliminados) {
           eliminados.add(`${fila},${columna},${numero}`);
         }
-        pasos.push(par);
+        pasos.push(deduccion);
       }
     }
 
