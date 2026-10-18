@@ -9,6 +9,7 @@ import {
   detectarHiddenSingles,
   detectarNakedPares,
   detectarNakedSingles,
+  detectarNakedTriples,
   obtenerCandidatos,
   resolverLogico,
   tableroEsValido,
@@ -412,6 +413,265 @@ test("los pasos de naked pair registran unidad, posiciones y eliminados", () => 
   }
   // Los pasos de par NO colocan números
   assert.equal(par.numero, undefined);
+});
+
+// ------------------------------------------------------------
+// Naked triples
+// ------------------------------------------------------------
+
+// Fila 0: falta {1,2,3,4}. El 4 de la caja 0 bloquea (0,0),(0,1),(0,2),
+// cuyos candidatos son los tres {1,2,3}; el trío desnudo elimina esos
+// tres números de (0,3).
+const NAKED_TRIPLE_FILA = [
+  [0, 0, 0, 0, 5, 6, 7, 8, 9],
+  [0, 0, 0, 0, 0, 0, 0, 0, 0],
+  [0, 4, 0, 0, 0, 0, 0, 0, 0],
+  [0, 0, 0, 0, 0, 0, 0, 0, 0],
+  [0, 0, 0, 0, 0, 0, 0, 0, 0],
+  [0, 0, 0, 0, 0, 0, 0, 0, 0],
+  [0, 0, 0, 0, 0, 0, 0, 0, 0],
+  [0, 0, 0, 0, 0, 0, 0, 0, 0],
+  [0, 0, 0, 0, 0, 0, 0, 0, 0],
+];
+
+// Misma fila 0, pero las tres casillas del trío tienen dos candidatos
+// cada una: (0,0)={1,2}, (0,1)={2,3} y (0,2)={1,3}.
+const NAKED_TRIPLE_DOS_CANDIDATOS = [
+  [0, 0, 0, 0, 5, 6, 7, 8, 9],
+  [0, 0, 0, 0, 0, 0, 0, 0, 0],
+  [0, 4, 0, 0, 0, 0, 0, 0, 0],
+  [3, 1, 2, 0, 0, 0, 0, 0, 0],
+  [0, 0, 0, 0, 0, 0, 0, 0, 0],
+  [0, 0, 0, 0, 0, 0, 0, 0, 0],
+  [0, 0, 0, 0, 0, 0, 0, 0, 0],
+  [0, 0, 0, 0, 0, 0, 0, 0, 0],
+  [0, 0, 0, 0, 0, 0, 0, 0, 0],
+];
+
+// Columna 0: falta {1,2,3,4}. El 4 de la caja 0 bloquea las filas 0-2,
+// que quedan con {1,2,3}; el trío elimina esos números de (3,0).
+const NAKED_TRIPLE_COLUMNA = [
+  [0, 0, 0, 0, 0, 0, 0, 0, 0],
+  [0, 4, 0, 0, 0, 0, 0, 0, 0],
+  [0, 0, 0, 0, 0, 0, 0, 0, 0],
+  [0, 0, 0, 0, 0, 0, 0, 0, 0],
+  [5, 0, 0, 0, 0, 0, 0, 0, 0],
+  [6, 0, 0, 0, 0, 0, 0, 0, 0],
+  [7, 0, 0, 0, 0, 0, 0, 0, 0],
+  [8, 0, 0, 0, 0, 0, 0, 0, 0],
+  [9, 0, 0, 0, 0, 0, 0, 0, 0],
+];
+
+// Caja 0: (0,0),(0,1),(0,2) quedan con {1,2,3}; el trío elimina esos
+// números de la otra casilla vacía de la caja, (1,0).
+const NAKED_TRIPLE_CAJA = [
+  [0, 0, 0, 4, 5, 6, 7, 8, 9],
+  [0, 5, 6, 7, 8, 9, 0, 0, 0],
+  [7, 8, 9, 1, 2, 3, 4, 5, 6],
+  [0, 0, 0, 0, 0, 0, 0, 0, 0],
+  [0, 0, 0, 0, 0, 0, 0, 0, 0],
+  [0, 0, 0, 0, 0, 0, 0, 0, 0],
+  [0, 0, 0, 0, 0, 0, 0, 0, 0],
+  [0, 0, 0, 0, 0, 0, 0, 0, 0],
+  [0, 0, 0, 0, 0, 0, 0, 0, 0],
+];
+
+// Trío en la fila 0 formado por las únicas tres casillas vacías, sin
+// ninguna otra casilla en la unidad de la que eliminar candidatos.
+const NAKED_TRIPLE_SIN_ELIMINAR = [
+  [0, 0, 0, 4, 5, 6, 7, 8, 9],
+  [4, 5, 6, 7, 8, 9, 1, 2, 3],
+  [7, 8, 9, 1, 2, 3, 4, 5, 6],
+  [0, 0, 0, 0, 0, 0, 0, 0, 0],
+  [0, 0, 0, 0, 0, 0, 0, 0, 0],
+  [0, 0, 0, 0, 0, 0, 0, 0, 0],
+  [0, 0, 0, 0, 0, 0, 0, 0, 0],
+  [0, 0, 0, 0, 0, 0, 0, 0, 0],
+  [0, 0, 0, 0, 0, 0, 0, 0, 0],
+];
+
+// Solución completa con huecos aislados: cada hueco es un naked single,
+// así que no existe ningún trío.
+const SIN_TRIPLES = [
+  [0, 2, 3, 4, 5, 6, 7, 8, 9],
+  [4, 5, 6, 7, 0, 9, 1, 2, 3],
+  [7, 8, 9, 1, 2, 3, 4, 0, 6],
+  [2, 0, 4, 5, 6, 7, 8, 9, 1],
+  [5, 6, 7, 8, 9, 1, 0, 3, 4],
+  [8, 9, 1, 2, 3, 4, 5, 6, 7],
+  [3, 4, 5, 6, 7, 8, 9, 1, 2],
+  [6, 7, 8, 9, 1, 2, 3, 4, 5],
+  [9, 1, 2, 3, 4, 5, 6, 7, 8],
+];
+
+test("detectarNakedTriples encuentra un trío en una fila", () => {
+  const triples = detectarNakedTriples(NAKED_TRIPLE_FILA);
+  const triple = triples.find(
+    (t) =>
+      t.unidad === "fila" &&
+      t.candidatos.join(",") === "1,2,3" &&
+      t.celdas.some(([fila, columna]) => fila === 0 && columna === 0)
+  );
+
+  assert.ok(triple);
+  assert.equal(triple.tecnica, TECNICAS.NAKED_TRIPLE);
+  assert.deepEqual(triple.celdas, [
+    [0, 0],
+    [0, 1],
+    [0, 2],
+  ]);
+  assert.deepEqual(triple.eliminados, [
+    [0, 3, 1],
+    [0, 3, 2],
+    [0, 3, 3],
+  ]);
+});
+
+test("detectarNakedTriples encuentra un trío en una columna", () => {
+  const triples = detectarNakedTriples(NAKED_TRIPLE_COLUMNA);
+  const triple = triples.find(
+    (t) =>
+      t.unidad === "columna" &&
+      t.candidatos.join(",") === "1,2,3" &&
+      t.celdas.some(([fila, columna]) => fila === 0 && columna === 0)
+  );
+
+  assert.ok(triple);
+  assert.deepEqual(triple.celdas, [
+    [0, 0],
+    [1, 0],
+    [2, 0],
+  ]);
+  assert.deepEqual(triple.eliminados, [
+    [3, 0, 1],
+    [3, 0, 2],
+    [3, 0, 3],
+  ]);
+});
+
+test("detectarNakedTriples encuentra un trío en una caja", () => {
+  const triples = detectarNakedTriples(NAKED_TRIPLE_CAJA);
+  const triple = triples.find(
+    (t) =>
+      t.unidad === "caja" &&
+      t.candidatos.join(",") === "1,2,3" &&
+      t.celdas.some(([fila, columna]) => fila === 0 && columna === 0)
+  );
+
+  assert.ok(triple);
+  assert.deepEqual(triple.celdas, [
+    [0, 0],
+    [0, 1],
+    [0, 2],
+  ]);
+  assert.deepEqual(triple.eliminados, [
+    [1, 0, 1],
+    [1, 0, 2],
+    [1, 0, 3],
+  ]);
+});
+
+test("detectarNakedTriples detecta un trío de casillas con dos candidatos", () => {
+  // Las tres casillas del trío tienen exactamente dos candidatos
+  assert.deepEqual(obtenerCandidatos(NAKED_TRIPLE_DOS_CANDIDATOS, 0, 0), [1, 2]);
+  assert.deepEqual(obtenerCandidatos(NAKED_TRIPLE_DOS_CANDIDATOS, 0, 1), [2, 3]);
+  assert.deepEqual(obtenerCandidatos(NAKED_TRIPLE_DOS_CANDIDATOS, 0, 2), [1, 3]);
+
+  const triples = detectarNakedTriples(NAKED_TRIPLE_DOS_CANDIDATOS);
+  const triple = triples.find(
+    (t) =>
+      t.unidad === "fila" &&
+      t.candidatos.join(",") === "1,2,3" &&
+      t.celdas.some(([fila, columna]) => fila === 0 && columna === 0)
+  );
+
+  assert.ok(triple);
+  assert.deepEqual(triple.celdas, [
+    [0, 0],
+    [0, 1],
+    [0, 2],
+  ]);
+  assert.ok(
+    triple.celdas.every(
+      ([fila, columna]) =>
+        obtenerCandidatos(NAKED_TRIPLE_DOS_CANDIDATOS, fila, columna).length === 2
+    )
+  );
+  assert.deepEqual(triple.eliminados, [
+    [0, 3, 1],
+    [0, 3, 2],
+    [0, 3, 3],
+  ]);
+});
+
+test("detectarNakedTriples no encuentra nada en un puzzle sin tríos", () => {
+  assert.deepEqual(detectarNakedTriples(SIN_TRIPLES), []);
+});
+
+test("un trío sin eliminaciones no es un paso efectivo", () => {
+  const triples = detectarNakedTriples(NAKED_TRIPLE_SIN_ELIMINAR);
+  const triple = triples.find(
+    (t) =>
+      t.unidad === "fila" &&
+      t.celdas.some(([fila, columna]) => fila === 0 && columna === 0)
+  );
+
+  // El trío se detecta, pero no descarta ningún candidato...
+  assert.ok(triple);
+  assert.deepEqual(triple.eliminados, []);
+  // ...así que ninguno de los tríos detectados sería un paso efectivo.
+  assert.equal(triples.some((t) => t.eliminados.length > 0), false);
+});
+
+test("detectarNakedTriples respeta eliminaciones previas y evita duplicarlas", () => {
+  // Ya se descartó el 1 de (0,3): el trío sigue detectándose, pero solo
+  // registra el 2 y el 3 de (0,3), sin repetir el 1.
+  const previos = new Set(["0,3,1"]);
+  const triples = detectarNakedTriples(NAKED_TRIPLE_DOS_CANDIDATOS, previos);
+  const triple = triples.find(
+    (t) =>
+      t.unidad === "fila" &&
+      t.candidatos.join(",") === "1,2,3" &&
+      t.celdas.some(([fila, columna]) => fila === 0 && columna === 0)
+  );
+
+  assert.ok(triple);
+  assert.deepEqual(triple.eliminados, [
+    [0, 3, 2],
+    [0, 3, 3],
+  ]);
+});
+
+test("una eliminación de trío habilita un naked single", () => {
+  // (0,3) empieza con cuatro candidatos: no es naked single.
+  assert.deepEqual(obtenerCandidatos(NAKED_TRIPLE_DOS_CANDIDATOS, 0, 3), [1, 2, 3, 4]);
+  assert.ok(
+    !detectarNakedSingles(NAKED_TRIPLE_DOS_CANDIDATOS).some(
+      (s) => s.fila === 0 && s.columna === 3
+    )
+  );
+
+  const triple = detectarNakedTriples(NAKED_TRIPLE_DOS_CANDIDATOS).find(
+    (t) =>
+      t.unidad === "fila" &&
+      t.celdas.some(([fila, columna]) => fila === 0 && columna === 0)
+  );
+  assert.ok(triple);
+
+  // Tras descontar los candidatos eliminados, (0,3) pasa a ser naked single 4
+  const eliminados = new Set(
+    triple.eliminados.map(([fila, columna, numero]) => `${fila},${columna},${numero}`)
+  );
+  const singles = detectarNakedSingles(NAKED_TRIPLE_DOS_CANDIDATOS, eliminados);
+  assert.ok(
+    singles.some((s) => s.fila === 0 && s.columna === 3 && s.numero === 4)
+  );
+});
+
+test("detectarNakedTriples no modifica el tablero original", () => {
+  const original = copiarTablero(NAKED_TRIPLE_FILA);
+  detectarNakedTriples(NAKED_TRIPLE_FILA);
+  assert.deepEqual(NAKED_TRIPLE_FILA, original);
 });
 
 // ------------------------------------------------------------

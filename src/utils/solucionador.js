@@ -24,6 +24,7 @@ export const TECNICAS = {
   HIDDEN_SINGLE: "hidden-single",
   NAKED_PAIR: "naked-pair",
   HIDDEN_PAIR: "hidden-pair",
+  NAKED_TRIPLE: "naked-triple",
 };
 
 // Estados posibles de un tablero según las técnicas disponibles
@@ -280,6 +281,83 @@ export function detectarNakedPares(tablero, eliminados = null) {
   }
 
   return pares;
+}
+
+/**
+ * Tríos desnudos: tres casillas vacías de una misma fila, columna o
+ * caja 3×3 cuyo conjunto combinado de candidatos son exactamente tres
+ * números distintos (por ejemplo {1,2}, {2,3} y {1,3}). Esos tres
+ * números quedan "reservados" a esas tres casillas, por lo que se
+ * eliminan del resto de casillas de la unidad.
+ *
+ * Solo participan casillas con dos o tres candidatos: una casilla con
+ * un único candidato es un naked single y no forma parte de un trío.
+ *
+ * No coloca ningún número: solo elimina candidatos.
+ *
+ * @param {Set<string>} [eliminados] - Candidatos descartados por otras
+ *   técnicas; se descuentan al calcular los candidatos.
+ * @returns {{
+ *   tecnica: string,
+ *   unidad: string,
+ *   celdas: [number, number][],
+ *   candidatos: number[],
+ *   eliminados: [number, number, number][]
+ * }[]} Cada trío detectado. `eliminados` puede quedar vacío si el trío
+ *   no descarta ningún candidato de la unidad.
+ */
+export function detectarNakedTriples(tablero, eliminados = null) {
+  const triples = [];
+
+  for (const { tipo, celdas } of UNIDADES) {
+    // Candidatos de todas las casillas vacías de la unidad
+    const vacias = celdas
+      .filter(([fila, columna]) => tablero[fila][columna] === 0)
+      .map(([fila, columna]) => ({
+        fila,
+        columna,
+        candidatos: candidatosDe(tablero, fila, columna, eliminados),
+      }));
+
+    // Solo pueden formar trío las casillas con dos o tres candidatos
+    const multicelda = vacias.filter(
+      (celda) => celda.candidatos.length >= 2 && celda.candidatos.length <= 3
+    );
+
+    for (let i = 0; i < multicelda.length; i++) {
+      for (let j = i + 1; j < multicelda.length; j++) {
+        for (let k = j + 1; k < multicelda.length; k++) {
+          const grupo = [multicelda[i], multicelda[j], multicelda[k]];
+          const candidatos = [
+            ...new Set(grupo.flatMap((celda) => celda.candidatos)),
+          ].sort((a, b) => a - b);
+
+          // El conjunto combinado debe tener exactamente tres números
+          if (candidatos.length !== 3) continue;
+
+          const descartes = [];
+          for (const otra of vacias) {
+            if (grupo.includes(otra)) continue;
+            for (const numero of candidatos) {
+              if (otra.candidatos.includes(numero)) {
+                descartes.push([otra.fila, otra.columna, numero]);
+              }
+            }
+          }
+
+          triples.push({
+            tecnica: TECNICAS.NAKED_TRIPLE,
+            unidad: tipo,
+            celdas: grupo.map((celda) => [celda.fila, celda.columna]),
+            candidatos,
+            eliminados: descartes,
+          });
+        }
+      }
+    }
+  }
+
+  return triples;
 }
 
 /**
