@@ -9,6 +9,7 @@ import {
   detectarHiddenSingles,
   detectarHiddenTriples,
   detectarNakedPares,
+  detectarNakedQuads,
   detectarNakedSingles,
   detectarNakedTriples,
   obtenerCandidatos,
@@ -673,6 +674,274 @@ test("detectarNakedTriples no modifica el tablero original", () => {
   const original = copiarTablero(NAKED_TRIPLE_FILA);
   detectarNakedTriples(NAKED_TRIPLE_FILA);
   assert.deepEqual(NAKED_TRIPLE_FILA, original);
+});
+
+// ------------------------------------------------------------
+// Naked quads
+// ------------------------------------------------------------
+
+// Fila 0: falta {1,2,3,4,5}. El 5 de la caja 0 bloquea (0,0), (0,1) y
+// (0,2), y el 5 de la columna 3 bloquea (0,3), así que esas cuatro
+// casillas tienen exactamente {1,2,3,4}. El cuarteto desnudo elimina
+// esos cuatro números de (0,4), que queda con el 5.
+const NAKED_QUAD_FILA = [
+  [0, 0, 0, 0, 0, 6, 7, 8, 9],
+  [0, 0, 0, 0, 0, 0, 0, 0, 0],
+  [5, 0, 0, 0, 0, 0, 0, 0, 0],
+  [0, 0, 0, 0, 0, 0, 0, 0, 0],
+  [0, 0, 0, 0, 0, 0, 0, 0, 0],
+  [0, 0, 0, 5, 0, 0, 0, 0, 0],
+  [0, 0, 0, 0, 0, 0, 0, 0, 0],
+  [0, 0, 0, 0, 0, 0, 0, 0, 0],
+  [0, 0, 0, 0, 0, 0, 0, 0, 0],
+];
+
+// Traspuesta del fixture anterior: el cuarteto está en la columna 0
+// ((0,0)-(3,0)) y elimina {1,2,3,4} de (4,0).
+const NAKED_QUAD_COLUMNA = [
+  [0, 0, 5, 0, 0, 0, 0, 0, 0],
+  [0, 0, 0, 0, 0, 0, 0, 0, 0],
+  [0, 0, 0, 0, 0, 0, 0, 0, 0],
+  [0, 0, 0, 0, 0, 5, 0, 0, 0],
+  [0, 0, 0, 0, 0, 0, 0, 0, 0],
+  [6, 0, 0, 0, 0, 0, 0, 0, 0],
+  [7, 0, 0, 0, 0, 0, 0, 0, 0],
+  [8, 0, 0, 0, 0, 0, 0, 0, 0],
+  [9, 0, 0, 0, 0, 0, 0, 0, 0],
+];
+
+// Caja 0: falta {1,2,3,4,5}. Las casillas (0,0), (0,1), (1,0) y (1,1)
+// combinan {1,2,3,4} y el cuarteto elimina esos números de (2,2).
+const NAKED_QUAD_CAJA = [
+  [0, 0, 6, 4, 5, 0, 0, 0, 0],
+  [0, 0, 7, 0, 0, 0, 5, 0, 0],
+  [8, 9, 0, 0, 0, 0, 0, 0, 0],
+  [3, 0, 0, 0, 0, 0, 0, 0, 0],
+  [0, 0, 0, 0, 0, 0, 0, 0, 0],
+  [0, 0, 0, 0, 0, 0, 0, 0, 0],
+  [0, 1, 0, 0, 0, 0, 0, 0, 0],
+  [0, 0, 0, 0, 0, 0, 0, 0, 0],
+  [0, 0, 0, 0, 0, 0, 0, 0, 0],
+];
+
+// Cuarteto en la fila 0 con subconjuntos distintos: (0,0)={1,2},
+// (0,1)={2,3}, (0,2)={3,4} y (0,3)={1,4}. La unión es {1,2,3,4}.
+const NAKED_QUAD_SUBCONJUNTOS = [
+  [0, 0, 0, 0, 0, 6, 7, 8, 9],
+  [5, 0, 0, 0, 0, 0, 0, 0, 0],
+  [0, 0, 0, 0, 0, 0, 0, 0, 0],
+  [3, 0, 2, 5, 0, 0, 0, 0, 0],
+  [4, 0, 0, 2, 0, 0, 0, 0, 0],
+  [0, 1, 0, 3, 0, 0, 0, 0, 0],
+  [0, 4, 0, 0, 0, 0, 0, 0, 0],
+  [0, 0, 1, 0, 0, 0, 0, 0, 0],
+  [0, 0, 0, 0, 0, 0, 0, 0, 0],
+];
+
+// Fila 0: las cuatro primeras casillas combinan cinco números
+// ({1,2,3,4,5}), por lo que no forman un cuarteto desnudo.
+const NAKED_QUAD_CINCO = [
+  [0, 0, 0, 0, 0, 6, 7, 8, 9],
+  [5, 0, 0, 0, 0, 0, 0, 0, 0],
+  [0, 0, 0, 0, 0, 0, 0, 0, 0],
+  [3, 1, 2, 0, 0, 0, 0, 0, 0],
+  [4, 0, 0, 1, 0, 0, 0, 0, 0],
+  [0, 0, 0, 3, 0, 0, 0, 0, 0],
+  [0, 4, 1, 2, 0, 0, 0, 0, 0],
+  [0, 0, 0, 0, 0, 0, 0, 0, 0],
+  [0, 0, 0, 0, 0, 0, 0, 0, 0],
+];
+
+// Fila 0: las cuatro casillas vacías combinan {1,2,3,4}, pero son las
+// únicas vacías de la fila, así que no hay ninguna eliminación real.
+const NAKED_QUAD_SIN_ELIMINAR = [
+  [0, 0, 0, 0, 5, 6, 7, 8, 9],
+  [4, 5, 6, 0, 0, 0, 0, 0, 0],
+  [7, 8, 9, 0, 0, 0, 0, 0, 0],
+  [0, 0, 0, 0, 0, 0, 0, 0, 0],
+  [0, 0, 0, 0, 0, 0, 0, 0, 0],
+  [0, 0, 0, 0, 0, 0, 0, 0, 0],
+  [0, 0, 0, 0, 0, 0, 0, 0, 0],
+  [0, 0, 0, 0, 0, 0, 0, 0, 0],
+  [0, 0, 0, 0, 0, 0, 0, 0, 0],
+];
+
+test("detectarNakedQuads encuentra un cuarteto en una fila", () => {
+  const quads = detectarNakedQuads(NAKED_QUAD_FILA);
+  const quad = quads.find(
+    (q) =>
+      q.tecnica === TECNICAS.NAKED_QUAD &&
+      q.unidad === "fila" &&
+      q.celdas.some(([fila, columna]) => fila === 0 && columna === 0)
+  );
+
+  assert.ok(quad);
+  assert.equal(TECNICAS.NAKED_QUAD, "naked-quad");
+  assert.deepEqual(quad.celdas, [
+    [0, 0],
+    [0, 1],
+    [0, 2],
+    [0, 3],
+  ]);
+  assert.deepEqual(quad.candidatos, [1, 2, 3, 4]);
+  assert.deepEqual(quad.eliminados, [
+    [0, 4, 1],
+    [0, 4, 2],
+    [0, 4, 3],
+    [0, 4, 4],
+  ]);
+});
+
+test("detectarNakedQuads encuentra un cuarteto en una columna", () => {
+  const quads = detectarNakedQuads(NAKED_QUAD_COLUMNA);
+  const quad = quads.find(
+    (q) =>
+      q.unidad === "columna" &&
+      q.celdas.some(([fila, columna]) => fila === 0 && columna === 0)
+  );
+
+  assert.ok(quad);
+  assert.deepEqual(quad.celdas, [
+    [0, 0],
+    [1, 0],
+    [2, 0],
+    [3, 0],
+  ]);
+  assert.deepEqual(quad.candidatos, [1, 2, 3, 4]);
+  assert.deepEqual(quad.eliminados, [
+    [4, 0, 1],
+    [4, 0, 2],
+    [4, 0, 3],
+    [4, 0, 4],
+  ]);
+});
+
+test("detectarNakedQuads encuentra un cuarteto en una caja", () => {
+  const quads = detectarNakedQuads(NAKED_QUAD_CAJA);
+  const quad = quads.find(
+    (q) =>
+      q.unidad === "caja" &&
+      q.celdas.some(([fila, columna]) => fila === 0 && columna === 0)
+  );
+
+  assert.ok(quad);
+  assert.deepEqual(quad.celdas, [
+    [0, 0],
+    [0, 1],
+    [1, 0],
+    [1, 1],
+  ]);
+  assert.deepEqual(quad.candidatos, [1, 2, 3, 4]);
+  assert.deepEqual(quad.eliminados, [
+    [2, 2, 1],
+    [2, 2, 2],
+    [2, 2, 3],
+    [2, 2, 4],
+  ]);
+});
+
+test("detectarNakedQuads acepta casillas con subconjuntos distintos", () => {
+  // Cada casilla del grupo tiene un subconjunto diferente de {1,2,3,4}
+  assert.deepEqual(obtenerCandidatos(NAKED_QUAD_SUBCONJUNTOS, 0, 0), [1, 2]);
+  assert.deepEqual(obtenerCandidatos(NAKED_QUAD_SUBCONJUNTOS, 0, 1), [2, 3]);
+  assert.deepEqual(obtenerCandidatos(NAKED_QUAD_SUBCONJUNTOS, 0, 2), [3, 4]);
+  assert.deepEqual(obtenerCandidatos(NAKED_QUAD_SUBCONJUNTOS, 0, 3), [1, 4]);
+
+  const quad = detectarNakedQuads(NAKED_QUAD_SUBCONJUNTOS).find(
+    (q) =>
+      q.unidad === "fila" &&
+      q.celdas.some(([fila, columna]) => fila === 0 && columna === 0)
+  );
+
+  assert.ok(quad);
+  assert.deepEqual(quad.candidatos, [1, 2, 3, 4]);
+  assert.deepEqual(quad.eliminados, [
+    [0, 4, 1],
+    [0, 4, 2],
+    [0, 4, 3],
+    [0, 4, 4],
+  ]);
+});
+
+test("detectarNakedQuads rechaza un grupo cuya unión tiene cinco candidatos", () => {
+  const grupo = [
+    [0, 0],
+    [0, 1],
+    [0, 2],
+    [0, 3],
+  ];
+  const union = new Set(
+    grupo.flatMap(([fila, columna]) =>
+      obtenerCandidatos(NAKED_QUAD_CINCO, fila, columna)
+    )
+  );
+  assert.equal(union.size, 5);
+
+  const quads = detectarNakedQuads(NAKED_QUAD_CINCO);
+  assert.equal(
+    quads.filter(
+      (q) => q.unidad === "fila" && q.celdas.some(([fila]) => fila === 0)
+    ).length,
+    0
+  );
+});
+
+test("detectarNakedQuads no devuelve cuartetos sin eliminaciones reales", () => {
+  const grupo = [
+    [0, 0],
+    [0, 1],
+    [0, 2],
+    [0, 3],
+  ];
+  // Las cuatro casillas combinan exactamente {1,2,3,4}...
+  assert.equal(
+    new Set(
+      grupo.flatMap(([fila, columna]) =>
+        obtenerCandidatos(NAKED_QUAD_SIN_ELIMINAR, fila, columna)
+      )
+    ).size,
+    4
+  );
+
+  // ...pero al no haber otra casilla vacía en la fila no eliminan nada,
+  // así que no se registran como deducción.
+  const quads = detectarNakedQuads(NAKED_QUAD_SIN_ELIMINAR);
+  assert.equal(
+    quads.filter(
+      (q) => q.unidad === "fila" && q.celdas.some(([fila]) => fila === 0)
+    ).length,
+    0
+  );
+  assert.ok(quads.every((q) => q.eliminados.length > 0));
+});
+
+test("detectarNakedQuads respeta eliminaciones previas y no las repite", () => {
+  // Ya se descartaron el 1 y el 2 de (0,4): el cuarteto sigue
+  // detectándose, pero solo registra el 3 y el 4 de esa casilla.
+  const previos = new Set(["0,4,1", "0,4,2"]);
+  const quad = detectarNakedQuads(NAKED_QUAD_FILA, previos).find(
+    (q) =>
+      q.unidad === "fila" &&
+      q.celdas.some(([fila, columna]) => fila === 0 && columna === 0)
+  );
+
+  assert.ok(quad);
+  assert.deepEqual(quad.eliminados, [
+    [0, 4, 3],
+    [0, 4, 4],
+  ]);
+});
+
+test("detectarNakedQuads no modifica el tablero original", () => {
+  const original = copiarTablero(NAKED_QUAD_FILA);
+  detectarNakedQuads(NAKED_QUAD_FILA);
+  assert.deepEqual(NAKED_QUAD_FILA, original);
+});
+
+test("detectarNakedQuads no produce falsos positivos sin cuartetos", () => {
+  // Las casillas vacías de SIN_TRIPLES están aisladas: ninguna unidad
+  // reúne cuatro casillas vacías, así que no puede haber cuarteto.
+  assert.deepEqual(detectarNakedQuads(SIN_TRIPLES), []);
 });
 
 // ------------------------------------------------------------
@@ -2133,5 +2402,418 @@ test("los tableros inválidos siguen clasificándose como inválidos con hidden 
     assert.equal(estado, ESTADOS.INVALIDO);
     assert.equal(pasos.length, 0);
     assert.ok(!pasos.some((p) => p.tecnica === TECNICAS.HIDDEN_TRIPLE));
+  }
+});
+
+// ------------------------------------------------------------
+// Naked quads integrados en resolverLogico
+// ------------------------------------------------------------
+
+// Puzzle de solución única que se BLOQUEA con singles, pares y tríos
+// (naked y hidden), pero se desbloquea con un naked quad: en la caja
+// 3-5/6-8 las casillas (3,8), (4,6), (4,8) y (5,8) combinan {5,7,8,9},
+// así que el cuarteto elimina esos números del resto de la caja. Las
+// eliminaciones habilitan un naked triple y, después, los singles que
+// permiten terminar el puzzle.
+const NAKED_QUAD_DESBLOQUEA = [
+  [0, 0, 0, 6, 0, 0, 0, 8, 0],
+  [0, 3, 0, 5, 0, 0, 1, 0, 0],
+  [0, 0, 0, 0, 0, 1, 3, 0, 4],
+  [5, 9, 0, 0, 6, 0, 0, 0, 0],
+  [6, 0, 4, 0, 0, 2, 0, 0, 0],
+  [0, 0, 2, 0, 9, 0, 0, 0, 0],
+  [4, 0, 0, 0, 3, 0, 0, 0, 1],
+  [0, 8, 0, 0, 0, 7, 0, 0, 2],
+  [0, 0, 0, 8, 0, 0, 0, 6, 3],
+];
+
+// Puzzle de solución única que se BLOQUEA con singles, pares y tríos y
+// avanza con un naked quad: en la caja 3-5/6-8 las casillas (3,6),
+// (4,6), (4,8) y (5,6) combinan {1,4,5,9}. El cuarteto elimina el 5 y
+// el 9 de la columna 7, habilitando en la iteración siguiente el hidden
+// single 5 de (0,7). El puzzle vuelve a bloquearse más adelante, pero
+// ya ha avanzado gracias al cuarteto.
+const NAKED_QUAD_HABILITA_SINGLE = [
+  [4, 0, 0, 0, 0, 0, 3, 0, 0],
+  [0, 5, 0, 0, 1, 3, 0, 0, 0],
+  [0, 9, 0, 0, 5, 0, 7, 0, 0],
+  [0, 1, 0, 0, 0, 0, 0, 0, 0],
+  [0, 8, 6, 9, 2, 0, 0, 0, 0],
+  [0, 0, 0, 0, 0, 0, 0, 0, 8],
+  [0, 0, 9, 0, 0, 0, 0, 1, 0],
+  [5, 0, 0, 0, 9, 0, 0, 4, 0],
+  [0, 0, 0, 6, 0, 4, 0, 8, 0],
+];
+
+test("un naked quad desbloquea un puzzle que antes quedaba bloqueado", () => {
+  const original = copiarTablero(NAKED_QUAD_DESBLOQUEA);
+  assert.equal(contarSoluciones(copiarTablero(NAKED_QUAD_DESBLOQUEA), 2), 1);
+
+  const { estado, pasos, tablero } = resolverLogico(NAKED_QUAD_DESBLOQUEA);
+
+  assert.equal(estado, ESTADOS.RESUELTO);
+  assert.equal(tablero.flat().filter((v) => v === 0).length, 0);
+
+  const indiceQuad = pasos.findIndex(
+    (p) => p.tecnica === TECNICAS.NAKED_QUAD
+  );
+  assert.ok(indiceQuad >= 0);
+
+  // Justo antes del primer naked quad no había ninguna técnica previa
+  // efectiva: ni singles, ni pares, ni tríos. Es decir, con las técnicas
+  // anteriores el puzzle se quedaba bloqueado.
+  const { enJuego, eliminados } = estadoAntesDe(
+    NAKED_QUAD_DESBLOQUEA,
+    pasos,
+    indiceQuad
+  );
+  assert.equal(detectarNakedSingles(enJuego, eliminados).length, 0);
+  assert.equal(detectarHiddenSingles(enJuego, eliminados).length, 0);
+  assert.equal(
+    detectarNakedPares(enJuego, eliminados).filter(
+      (p) => p.eliminados.length > 0
+    ).length,
+    0
+  );
+  assert.equal(
+    detectarHiddenPares(enJuego, eliminados).filter(
+      (p) => p.eliminados.length > 0
+    ).length,
+    0
+  );
+  assert.equal(
+    detectarNakedTriples(enJuego, eliminados).filter(
+      (t) => t.eliminados.length > 0
+    ).length,
+    0
+  );
+  assert.equal(
+    detectarHiddenTriples(enJuego, eliminados).filter(
+      (t) => t.eliminados.length > 0
+    ).length,
+    0
+  );
+  // ...pero sí había un naked quad efectivo.
+  assert.ok(
+    detectarNakedQuads(enJuego, eliminados).some(
+      (q) => q.eliminados.length > 0
+    )
+  );
+
+  // El tablero original no se modifica
+  assert.deepEqual(NAKED_QUAD_DESBLOQUEA, original);
+});
+
+test("las eliminaciones de un naked quad se conservan entre iteraciones", () => {
+  const { pasos } = resolverLogico(NAKED_QUAD_DESBLOQUEA);
+  const indiceQuad = pasos.findIndex(
+    (p) => p.tecnica === TECNICAS.NAKED_QUAD
+  );
+  assert.ok(indiceQuad >= 0);
+  assert.ok(pasos[indiceQuad].eliminados.length > 0);
+
+  // Reproducir hasta justo después del cuarteto: los candidatos
+  // descartados siguen registrados y no reaparecen al recalcular.
+  const { enJuego, eliminados } = estadoAntesDe(
+    NAKED_QUAD_DESBLOQUEA,
+    pasos,
+    indiceQuad + 1
+  );
+  for (const [fila, columna, numero] of pasos[indiceQuad].eliminados) {
+    assert.ok(eliminados.has(`${fila},${columna},${numero}`));
+    const candidatos = obtenerCandidatos(enJuego, fila, columna).filter(
+      (n) => !eliminados.has(`${fila},${columna},${n}`)
+    );
+    assert.ok(!candidatos.includes(numero));
+  }
+
+  // Ningún paso posterior vuelve a colocar un número que el cuarteto eliminó.
+  for (let i = indiceQuad + 1; i < pasos.length; i++) {
+    const paso = pasos[i];
+    if (paso.eliminados) continue;
+    assert.ok(
+      !pasos[indiceQuad].eliminados.some(
+        ([fila, columna, numero]) =>
+          fila === paso.fila && columna === paso.columna && numero === paso.numero
+      ),
+      `se colocó un candidato eliminado en (${paso.fila},${paso.columna})`
+    );
+  }
+});
+
+test("una eliminación de naked quad habilita un single en una iteración posterior", () => {
+  const original = copiarTablero(NAKED_QUAD_HABILITA_SINGLE);
+  assert.equal(
+    contarSoluciones(copiarTablero(NAKED_QUAD_HABILITA_SINGLE), 2),
+    1
+  );
+
+  const { estado, pasos, tablero } = resolverLogico(
+    NAKED_QUAD_HABILITA_SINGLE
+  );
+  const indiceQuad = pasos.findIndex(
+    (p) => p.tecnica === TECNICAS.NAKED_QUAD
+  );
+  assert.ok(indiceQuad >= 0);
+
+  const { enJuego, eliminados } = estadoAntesDe(
+    NAKED_QUAD_HABILITA_SINGLE,
+    pasos,
+    indiceQuad
+  );
+
+  // Antes del cuarteto no hay ningún single y (0,7) tiene tres candidatos.
+  assert.equal(detectarNakedSingles(enJuego, eliminados).length, 0);
+  assert.equal(detectarHiddenSingles(enJuego, eliminados).length, 0);
+  assert.deepEqual(obtenerCandidatos(enJuego, 0, 7), [2, 5, 6]);
+
+  // Tras descontar sus eliminaciones aparece un hidden single.
+  const conEliminaciones = new Set(eliminados);
+  for (const [fila, columna, numero] of pasos[indiceQuad].eliminados) {
+    conEliminaciones.add(`${fila},${columna},${numero}`);
+  }
+  assert.ok(
+    detectarHiddenSingles(enJuego, conEliminaciones).some(
+      (s) => s.fila === 0 && s.columna === 7 && s.numero === 5
+    )
+  );
+
+  // El solver lo detecta en la iteración siguiente (progreso garantizado)
+  assert.equal(pasos[indiceQuad + 1].tecnica, TECNICAS.HIDDEN_SINGLE);
+  assert.equal(pasos[indiceQuad + 1].fila, 0);
+  assert.equal(pasos[indiceQuad + 1].columna, 7);
+  assert.equal(pasos[indiceQuad + 1].numero, 5);
+
+  // El puzzle avanza (coloca números) y luego vuelve a bloquearse: con
+  // las técnicas anteriores ni siquiera habría empezado a avanzar aquí.
+  assert.ok(
+    pasos.slice(indiceQuad + 1).some((paso) => !paso.eliminados)
+  );
+  assert.equal(estado, ESTADOS.BLOQUEADO);
+  assert.ok(
+    tablero.flat().filter((v) => v === 0).length <
+      enJuego.flat().filter((v) => v === 0).length
+  );
+
+  // El tablero original no se modifica
+  assert.deepEqual(NAKED_QUAD_HABILITA_SINGLE, original);
+});
+
+test("los pasos con naked quads se reproducen sin contradicciones", () => {
+  const { pasos, tablero } = resolverLogico(NAKED_QUAD_DESBLOQUEA);
+
+  const enJuego = copiarTablero(NAKED_QUAD_DESBLOQUEA);
+  const eliminados = new Set();
+  let quadsVistos = 0;
+
+  for (const paso of pasos) {
+    if (
+      paso.tecnica === TECNICAS.NAKED_SINGLE ||
+      paso.tecnica === TECNICAS.HIDDEN_SINGLE
+    ) {
+      assert.ok(
+        esValido(enJuego, paso.fila, paso.columna, paso.numero),
+        `paso contradictorio en (${paso.fila},${paso.columna}) = ${paso.numero}`
+      );
+      enJuego[paso.fila][paso.columna] = paso.numero;
+      continue;
+    }
+
+    // Técnicas de eliminación: no colocan número y eliminan candidatos
+    // que todavía estaban presentes.
+    assert.equal(paso.numero, undefined);
+    assert.ok(paso.eliminados.length > 0);
+
+    let tamano = 2;
+    if (
+      paso.tecnica === TECNICAS.NAKED_TRIPLE ||
+      paso.tecnica === TECNICAS.HIDDEN_TRIPLE
+    ) {
+      tamano = 3;
+    }
+    if (paso.tecnica === TECNICAS.NAKED_QUAD) {
+      tamano = 4;
+      quadsVistos++;
+    }
+    assert.equal(paso.celdas.length, tamano);
+    assert.equal(paso.candidatos.length, tamano);
+
+    for (const [fila, columna, numero] of paso.eliminados) {
+      const clave = `${fila},${columna},${numero}`;
+      const candidatos = obtenerCandidatos(enJuego, fila, columna).filter(
+        (n) => !eliminados.has(`${fila},${columna},${n}`)
+      );
+      assert.ok(candidatos.includes(numero), `eliminación inexistente ${clave}`);
+
+      if (
+        paso.tecnica === TECNICAS.HIDDEN_PAIR ||
+        paso.tecnica === TECNICAS.HIDDEN_TRIPLE
+      ) {
+        assert.ok(!paso.candidatos.includes(numero));
+        assert.ok(paso.celdas.some(([f, c]) => f === fila && c === columna));
+      } else {
+        assert.ok(paso.candidatos.includes(numero));
+        assert.ok(!paso.celdas.some(([f, c]) => f === fila && c === columna));
+      }
+
+      eliminados.add(clave);
+    }
+  }
+
+  assert.ok(quadsVistos > 0);
+  assert.deepEqual(enJuego, tablero);
+  assert.equal(tableroEsValido(tablero), true);
+});
+
+test("resolverLogico registra naked quads sin colocar números ni eliminar de más", () => {
+  const { pasos } = resolverLogico(NAKED_QUAD_DESBLOQUEA);
+  const quads = pasos.filter((p) => p.tecnica === TECNICAS.NAKED_QUAD);
+
+  assert.ok(quads.length > 0);
+  for (const quad of quads) {
+    assert.equal(quad.numero, undefined);
+    assert.equal(quad.celdas.length, 4);
+    assert.equal(quad.candidatos.length, 4);
+    assert.ok(quad.eliminados.length > 0);
+    assert.ok(["fila", "columna", "caja"].includes(quad.unidad));
+    for (const [fila, columna, numero] of quad.eliminados) {
+      assert.ok(quad.candidatos.includes(numero));
+      assert.ok(!quad.celdas.some(([f, c]) => f === fila && c === columna));
+    }
+  }
+});
+
+test("las técnicas conservan su prioridad también con naked quads", () => {
+  const fixtures = [
+    NAKED_QUAD_DESBLOQUEA,
+    NAKED_QUAD_HABILITA_SINGLE,
+    HIDDEN_TRIPLE_DESBLOQUEA,
+    NAKED_TRIPLE_DESBLOQUEA,
+    NAKED_TRIPLE_FILA_DESBLOQUEA,
+    HIDDEN_PAIR_DESBLOQUEA,
+    SE_BLOQUEA_DESPUES,
+    PAR_HABILITA_SINGLES_SIN_SINGLES,
+    RESOLUBLE_SINGLES,
+  ];
+
+  let quadsVistos = 0;
+
+  for (const fixture of fixtures) {
+    const { pasos } = resolverLogico(fixture);
+    const enJuego = copiarTablero(fixture);
+    const eliminados = new Set();
+
+    for (const paso of pasos) {
+      // Un hidden single solo se aplica cuando no hay naked singles
+      if (paso.tecnica === TECNICAS.HIDDEN_SINGLE) {
+        assert.equal(detectarNakedSingles(enJuego, eliminados).length, 0);
+      }
+
+      if (paso.eliminados) {
+        // Antes de cualquier técnica de eliminación no debe quedar single
+        assert.equal(detectarNakedSingles(enJuego, eliminados).length, 0);
+        assert.equal(detectarHiddenSingles(enJuego, eliminados).length, 0);
+
+        if (paso.tecnica === TECNICAS.HIDDEN_PAIR) {
+          assert.equal(
+            detectarNakedPares(enJuego, eliminados).filter(
+              (p) => p.eliminados.length > 0
+            ).length,
+            0
+          );
+        }
+        if (paso.tecnica === TECNICAS.NAKED_TRIPLE) {
+          assert.equal(
+            detectarNakedPares(enJuego, eliminados).filter(
+              (p) => p.eliminados.length > 0
+            ).length,
+            0
+          );
+          assert.equal(
+            detectarHiddenPares(enJuego, eliminados).filter(
+              (p) => p.eliminados.length > 0
+            ).length,
+            0
+          );
+        }
+        if (paso.tecnica === TECNICAS.HIDDEN_TRIPLE) {
+          assert.equal(
+            detectarNakedPares(enJuego, eliminados).filter(
+              (p) => p.eliminados.length > 0
+            ).length,
+            0
+          );
+          assert.equal(
+            detectarHiddenPares(enJuego, eliminados).filter(
+              (p) => p.eliminados.length > 0
+            ).length,
+            0
+          );
+          assert.equal(
+            detectarNakedTriples(enJuego, eliminados).filter(
+              (t) => t.eliminados.length > 0
+            ).length,
+            0
+          );
+        }
+        // El naked quad es la última técnica: solo se aplica si ninguna
+        // de las anteriores produce una deducción efectiva.
+        if (paso.tecnica === TECNICAS.NAKED_QUAD) {
+          quadsVistos++;
+          assert.equal(
+            detectarNakedPares(enJuego, eliminados).filter(
+              (p) => p.eliminados.length > 0
+            ).length,
+            0
+          );
+          assert.equal(
+            detectarHiddenPares(enJuego, eliminados).filter(
+              (p) => p.eliminados.length > 0
+            ).length,
+            0
+          );
+          assert.equal(
+            detectarNakedTriples(enJuego, eliminados).filter(
+              (t) => t.eliminados.length > 0
+            ).length,
+            0
+          );
+          assert.equal(
+            detectarHiddenTriples(enJuego, eliminados).filter(
+              (t) => t.eliminados.length > 0
+            ).length,
+            0
+          );
+        }
+
+        for (const [fila, columna, numero] of paso.eliminados) {
+          eliminados.add(`${fila},${columna},${numero}`);
+        }
+      } else {
+        enJuego[paso.fila][paso.columna] = paso.numero;
+      }
+    }
+  }
+
+  // Los cuartetos retrasados se ejercieron en la reproducción
+  assert.ok(quadsVistos > 0);
+});
+
+test("los tableros inválidos siguen clasificándose como inválidos con naked quads", () => {
+  for (const invalido of [
+    DUPLICADO_FILA,
+    DUPLICADO_COLUMNA,
+    DUPLICADO_CAJA,
+    FUERA_DE_RANGO,
+    ESTRUCTURA_ROTA,
+    CASILLA_MUERTA,
+  ]) {
+    const original = copiarTablero(invalido);
+    const { estado, pasos, tablero } = resolverLogico(invalido);
+    assert.equal(estado, ESTADOS.INVALIDO);
+    assert.equal(pasos.length, 0);
+    assert.ok(!pasos.some((p) => p.tecnica === TECNICAS.NAKED_QUAD));
+    assert.deepEqual(tablero, original);
+    assert.deepEqual(invalido, original);
   }
 });
