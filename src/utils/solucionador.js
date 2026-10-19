@@ -25,6 +25,7 @@ export const TECNICAS = {
   NAKED_PAIR: "naked-pair",
   HIDDEN_PAIR: "hidden-pair",
   NAKED_TRIPLE: "naked-triple",
+  HIDDEN_TRIPLE: "hidden-triple",
 };
 
 // Estados posibles de un tablero según las técnicas disponibles
@@ -444,9 +445,94 @@ export function detectarHiddenPares(tablero, eliminados = null) {
 }
 
 /**
+ * Tríos ocultos: tres números distintos que, dentro de una misma fila,
+ * columna o caja 3×3, pueden colocarse únicamente en las mismas tres
+ * casillas vacías. Esas casillas pueden admitir candidatos adicionales,
+ * pero los tres números del trío quedan restringidos a ellas, por lo que
+ * se eliminan de las tres casillas todos los candidatos que no sean uno
+ * de los tres números del trío.
+ *
+ * No coloca ningún número: solo elimina candidatos.
+ *
+ * @param {Set<string>} [eliminados] - Candidatos descartados por otras
+ *   técnicas; se descuentan al calcular los candidatos.
+ * @returns {{
+ *   tecnica: string,
+ *   unidad: string,
+ *   celdas: [number, number][],
+ *   candidatos: number[],
+ *   eliminados: [number, number, number][]
+ * }[]} Cada trío detectado. `eliminados` puede quedar vacío si el trío
+ *   no descarta ningún candidato.
+ */
+export function detectarHiddenTriples(tablero, eliminados = null) {
+  const triples = [];
+
+  for (const { tipo, celdas } of UNIDADES) {
+    // Candidatos de todas las casillas vacías de la unidad
+    const vacias = celdas
+      .filter(([fila, columna]) => tablero[fila][columna] === 0)
+      .map(([fila, columna]) => ({
+        fila,
+        columna,
+        candidatos: candidatosDe(tablero, fila, columna, eliminados),
+      }));
+
+    if (vacias.length < 3) continue;
+
+    for (let n1 = 1; n1 <= TAMAÑO; n1++) {
+      const conN1 = vacias.filter((celda) => celda.candidatos.includes(n1));
+      if (conN1.length === 0) continue;
+
+      for (let n2 = n1 + 1; n2 <= TAMAÑO; n2++) {
+        const conN2 = vacias.filter((celda) => celda.candidatos.includes(n2));
+        if (conN2.length === 0) continue;
+
+        for (let n3 = n2 + 1; n3 <= TAMAÑO; n3++) {
+          const conN3 = vacias.filter((celda) => celda.candidatos.includes(n3));
+          if (conN3.length === 0) continue;
+
+          // Unión de las casillas donde cabe alguno de los tres números
+          const unicas = new Map();
+          for (const celda of [...conN1, ...conN2, ...conN3]) {
+            unicas.set(`${celda.fila},${celda.columna}`, celda);
+          }
+          // Los tres números deben quedar restringidos a tres casillas
+          if (unicas.size !== 3) continue;
+
+          // Esas tres casillas solo pueden alojar el trío: se descartan
+          // de ellas los candidatos ajenos a los tres números.
+          const grupo = [...unicas.values()].sort(
+            (a, b) => a.fila - b.fila || a.columna - b.columna
+          );
+          const descartes = [];
+          for (const celda of grupo) {
+            for (const numero of celda.candidatos) {
+              if (numero !== n1 && numero !== n2 && numero !== n3) {
+                descartes.push([celda.fila, celda.columna, numero]);
+              }
+            }
+          }
+
+          triples.push({
+            tecnica: TECNICAS.HIDDEN_TRIPLE,
+            unidad: tipo,
+            celdas: grupo.map((celda) => [celda.fila, celda.columna]),
+            candidatos: [n1, n2, n3],
+            eliminados: descartes,
+          });
+        }
+      }
+    }
+  }
+
+  return triples;
+}
+
+/**
  * Clasificación interna que, a diferencia de clasificarTablero,
  * descuenta los candidatos ya eliminados (por naked/hidden pairs y
- * naked triples) y tiene en cuenta si queda alguna técnica de
+ * naked/hidden triples) y tiene en cuenta si queda alguna técnica de
  * eliminación aplicable. Es la que usa resolverLogico para decidir si
  * aún puede avanzar.
  */
@@ -470,6 +556,10 @@ function clasificarConEliminaciones(tablero, eliminados) {
   }
   const triples = detectarNakedTriples(tablero, eliminados);
   if (triples.some((triple) => triple.eliminados.length > 0)) {
+    return ESTADOS.RESOLUBLE;
+  }
+  const triplesOcultos = detectarHiddenTriples(tablero, eliminados);
+  if (triplesOcultos.some((triple) => triple.eliminados.length > 0)) {
     return ESTADOS.RESOLUBLE;
   }
   return ESTADOS.BLOQUEADO;
@@ -501,8 +591,9 @@ export function clasificarTablero(tablero) {
 /**
  * Aplica técnicas hasta que no quede ninguna disponible. Prioridad:
  * naked singles, hidden singles y, si no hay singles, naked pairs,
- * luego hidden pairs y por último naked triples (las técnicas de
- * eliminación quitan candidatos y pueden habilitar nuevos singles).
+ * luego hidden pairs, luego naked triples y por último hidden triples
+ * (las técnicas de eliminación quitan candidatos y pueden habilitar
+ * nuevos singles).
  * Recalcula los candidatos tras cada deducción, de modo que cada paso
  * se valida contra el tablero actual: nunca coloca un número que rompa
  * las reglas. Si el tablero de entrada es inválido o contradictorio no
@@ -545,9 +636,10 @@ export function resolverLogico(tablero) {
         pasos.push(paso);
       } else {
         // Sin singles: aplicar la técnica de eliminación efectiva de
-        // mayor prioridad (naked pair → hidden pair → naked triple).
-        // Si ninguna elimina candidatos, la clasificación no habría
-        // devuelto "resoluble" y el bucle ya habría terminado.
+        // mayor prioridad (naked pair → hidden pair → naked triple →
+        // hidden triple). Si ninguna elimina candidatos, la
+        // clasificación no habría devuelto "resoluble" y el bucle ya
+        // habría terminado.
         let deduccion = detectarNakedPares(copia, eliminados).find(
           (p) => p.eliminados.length > 0
         );
@@ -558,6 +650,11 @@ export function resolverLogico(tablero) {
         }
         if (!deduccion) {
           deduccion = detectarNakedTriples(copia, eliminados).find(
+            (t) => t.eliminados.length > 0
+          );
+        }
+        if (!deduccion) {
+          deduccion = detectarHiddenTriples(copia, eliminados).find(
             (t) => t.eliminados.length > 0
           );
         }
