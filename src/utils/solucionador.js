@@ -33,6 +33,8 @@ export const TECNICAS = {
 // Estados posibles de un tablero según las técnicas disponibles
 export const ESTADOS = {
   RESUELTO: "resuelto",
+  // clasificarTablero encontró al menos un single aplicable. Es una
+  // condición local: no garantiza que el Sudoku tenga solución.
   RESOLUBLE: "resoluble",
   BLOQUEADO: "bloqueado",
   // Sin solución posible: números repetidos, valores fuera de rango,
@@ -769,12 +771,17 @@ function clasificarConEliminaciones(tablero, eliminados) {
  *                 candidatos, así que no tiene solución posible.
  * - "resuelto":   completo y sin números repetidos.
  * - "resoluble":  al menos un single (naked u hidden) se puede aplicar.
+ *                 Es una condición local: no garantiza que el Sudoku
+ *                 tenga solución.
  * - "bloqueado":  quedan vacías pero ningún single aplica.
  *
- * Es una clasificación basada solo en el tablero (sin estado de
- * candidatos eliminados), por lo que las técnicas de pares (desnudos
- * u ocultos) no la alteran: esas técnicas se aplican en resolverLogico,
- * que sí conserva las eliminaciones entre iteraciones.
+ * Solo considera singles. resolverLogico() también aplica pares,
+ * tríos y cuads, por lo que puede avanzar y devolver otro estado en
+ * tableros que aquí aparecen como "bloqueado". Es una clasificación
+ * basada solo en el tablero (sin estado de candidatos eliminados), por
+ * lo que las técnicas de pares (desnudos u ocultos) no la alteran: esas
+ * técnicas se aplican en resolverLogico, que sí conserva las
+ * eliminaciones entre iteraciones.
  */
 export function clasificarTablero(tablero) {
   if (!tableroEsValido(tablero)) return ESTADOS.INVALIDO;
@@ -803,15 +810,34 @@ export function clasificarTablero(tablero) {
  * posterior. Nunca se registra una técnica cuyas eliminaciones no
  * cambien nada.
  *
+ * Valida la estructura antes de copiar: cualquier entrada que no sea
+ * un tablero 9x9 de enteros 0..9 (incluidos null, undefined, strings o
+ * filas no iterables) devuelve estado "invalido", sin pasos y sin
+ * lanzar excepciones.
+ *
  * El tablero recibido NUNCA se modifica: se trabaja sobre una copia.
+ * Si la entrada no se puede copiar, el campo `tablero` del resultado
+ * es la propia entrada, sin transformarla.
  *
  * @param {number[][]} tablero
  * @returns {{estado: string, pasos: object[], tablero: number[][]}}
  *   estado: "resuelto" | "bloqueado" | "invalido"; pasos: técnica
  *   aplicada en cada iteración, en orden (los singles colocan un
  *   número; los pares y tríos registran candidatos eliminados).
+ *   tablero: copia del tablero; si la entrada no se puede copiar, la
+ *   entrada original tal cual.
  */
 export function resolverLogico(tablero) {
+  if (!tableroEsValido(tablero)) {
+    // Contrato previo: los tableros inválidos copiables se devuelven
+    // como copia; los no copiables se devuelven tal cual.
+    const tableroInvalido =
+      Array.isArray(tablero) && tablero.every(Array.isArray)
+        ? tablero.map((fila) => [...fila])
+        : tablero;
+    return { estado: ESTADOS.INVALIDO, pasos: [], tablero: tableroInvalido };
+  }
+
   const copia = copiarTablero(tablero);
   const pasos = [];
   const eliminados = new Set();

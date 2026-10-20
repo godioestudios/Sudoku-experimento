@@ -17,7 +17,12 @@ import {
   resolverLogico,
   tableroEsValido,
 } from "../src/utils/solucionador.js";
-import { copiarTablero, contarSoluciones, esValido } from "../src/utils/sudoku.js";
+import {
+  copiarTablero,
+  contarSoluciones,
+  esValido,
+  resolverSudoku,
+} from "../src/utils/sudoku.js";
 
 // ------------------------------------------------------------
 // Fixtures deterministas
@@ -1022,6 +1027,53 @@ test("resolverLogico no aplica pasos sobre tableros inválidos", () => {
     assert.deepEqual(tablero, original); // ni siquiera intenta deducir
     assert.deepEqual(invalido, original); // el original queda intacto
   }
+});
+
+test("resolverLogico devuelve invalido sin lanzar si la entrada no es un tablero", () => {
+  for (const entrada of [null, undefined, "texto"]) {
+    let resultado;
+    assert.doesNotThrow(() => {
+      resultado = resolverLogico(entrada);
+    });
+    assert.equal(resultado.estado, ESTADOS.INVALIDO);
+    assert.deepEqual(resultado.pasos, []);
+    // Entrada no copiable: se devuelve tal cual, sin transformarla.
+    assert.equal(resultado.tablero, entrada);
+  }
+});
+
+test("resolverLogico devuelve invalido sin lanzar si una fila no es copiable", () => {
+  const entrada = [null];
+  let resultado;
+  assert.doesNotThrow(() => {
+    resultado = resolverLogico(entrada);
+  });
+  assert.equal(resultado.estado, ESTADOS.INVALIDO);
+  assert.deepEqual(resultado.pasos, []);
+  // Entrada no copiable: se devuelve tal cual, sin transformarla.
+  assert.equal(resultado.tablero, entrada);
+});
+
+test("resolverLogico conserva el contrato de copia en tableros inválidos copiables", () => {
+  const original = copiarTablero(ESTRUCTURA_ROTA);
+  const { estado, pasos, tablero } = resolverLogico(ESTRUCTURA_ROTA);
+
+  assert.equal(estado, ESTADOS.INVALIDO);
+  assert.deepEqual(pasos, []);
+  assert.deepEqual(tablero, original);
+  assert.notEqual(tablero, ESTRUCTURA_ROTA);
+  assert.notEqual(tablero[0], ESTRUCTURA_ROTA[0]);
+  assert.deepEqual(ESTRUCTURA_ROTA, original);
+});
+
+test("una entrada válida conserva estado, pasos y tablero original", () => {
+  const original = copiarTablero(RESOLUBLE_SINGLES);
+  const { estado, pasos, tablero } = resolverLogico(RESOLUBLE_SINGLES);
+
+  assert.equal(estado, ESTADOS.RESUELTO);
+  assert.equal(pasos.length, 51);
+  assert.deepEqual(tablero, SOLUCION);
+  assert.deepEqual(RESOLUBLE_SINGLES, original);
 });
 
 // ------------------------------------------------------------
@@ -3074,22 +3126,22 @@ test("los tableros inválidos siguen clasificándose como inválidos con naked q
 // Hidden quads integrados en resolverLogico
 // ------------------------------------------------------------
 
-// Puzzle que queda BLOQUEADO con singles, pares, tríos y naked quads:
-// en la caja 0 el cuarteto oculto {1,2,3,4} ocupa (1,1), (1,2), (2,1) y
-// (2,2), por lo que elimina los candidatos ajenos de esas cuatro
-// casillas. Entre ellos, el 6 de (1,1) y (1,2) deja el 6 como hidden
-// single de la fila 1 en (1,6). Después el solver avanza con otro
-// hidden single, pero vuelve a bloquearse.
+// Puzzle de solución única que queda BLOQUEADO con singles, pares,
+// tríos y naked quads: en la caja 0 el cuarteto oculto {1,2,3,4} ocupa
+// (1,1), (1,2), (2,1) y (2,2), por lo que elimina los candidatos ajenos
+// de esas cuatro casillas. Entre ellos, el 6 de (1,1) y (1,2) deja el 6
+// como hidden single de la fila 1 en (1,6). Después el solver avanza con
+// otro hidden single, pero vuelve a bloquearse.
 const HIDDEN_QUAD_DESBLOQUEA = [
   [0, 0, 0, 1, 2, 3, 4, 0, 0],
-  [0, 0, 0, 5, 0, 0, 0, 1, 0],
-  [0, 0, 0, 6, 0, 0, 0, 3, 0],
-  [1, 0, 0, 0, 0, 0, 5, 0, 6],
-  [2, 0, 0, 8, 0, 0, 3, 7, 0],
-  [3, 0, 0, 0, 0, 0, 0, 0, 0],
-  [4, 2, 0, 0, 0, 0, 0, 0, 0],
-  [6, 0, 0, 4, 0, 0, 0, 8, 0],
-  [0, 0, 0, 0, 6, 0, 0, 0, 0],
+  [0, 0, 0, 5, 0, 9, 0, 1, 0],
+  [0, 0, 0, 6, 7, 0, 0, 3, 0],
+  [1, 0, 0, 3, 0, 7, 5, 2, 6],
+  [2, 5, 0, 8, 0, 0, 3, 7, 0],
+  [3, 0, 0, 0, 5, 0, 0, 4, 0],
+  [4, 2, 0, 7, 0, 5, 0, 0, 0],
+  [6, 9, 0, 4, 0, 0, 7, 8, 0],
+  [0, 0, 0, 0, 6, 0, 0, 0, 4],
 ];
 
 test("un hidden quad desbloquea un puzzle que antes quedaba bloqueado", () => {
@@ -3149,6 +3201,74 @@ test("un hidden quad desbloquea un puzzle que antes quedaba bloqueado", () => {
 
   // El tablero original no se modifica
   assert.deepEqual(HIDDEN_QUAD_DESBLOQUEA, original);
+});
+
+test("el fixture hidden quad es válido, único y sus eliminaciones respetan la solución", () => {
+  const original = copiarTablero(HIDDEN_QUAD_DESBLOQUEA);
+
+  // Validez y solución única verificadas sin el solucionador lógico.
+  assert.equal(tableroEsValido(HIDDEN_QUAD_DESBLOQUEA), true);
+  assert.equal(contarSoluciones(copiarTablero(HIDDEN_QUAD_DESBLOQUEA), 2), 1);
+
+  const solucion = copiarTablero(HIDDEN_QUAD_DESBLOQUEA);
+  assert.equal(resolverSudoku(solucion), true);
+  assert.equal(tableroEsValido(solucion), true);
+  assert.deepEqual(HIDDEN_QUAD_DESBLOQUEA, original);
+
+  const { pasos } = resolverLogico(HIDDEN_QUAD_DESBLOQUEA);
+  assert.equal(pasos[0].tecnica, TECNICAS.HIDDEN_QUAD);
+
+  const quadInicial = pasos[0];
+  assert.equal(quadInicial.unidad, "caja");
+  assert.deepEqual(quadInicial.celdas, [
+    [1, 1],
+    [1, 2],
+    [2, 1],
+    [2, 2],
+  ]);
+  assert.deepEqual(quadInicial.candidatos, [1, 2, 3, 4]);
+
+  const eliminaciones = pasos
+    .filter((paso) => paso.tecnica === TECNICAS.HIDDEN_QUAD)
+    .flatMap((paso) => paso.eliminados);
+  assert.ok(eliminaciones.length > 0);
+
+  // Ninguna eliminación se registra dos veces en todo el proceso.
+  const claves = eliminaciones.map(
+    ([fila, columna, numero]) => `${fila},${columna},${numero}`
+  );
+  assert.equal(new Set(claves).size, claves.length);
+
+  for (const paso of pasos) {
+    if (paso.tecnica !== TECNICAS.HIDDEN_QUAD) continue;
+
+    assert.equal(paso.unidad, "caja");
+    assert.equal(paso.celdas.length, 4);
+    assert.equal(paso.candidatos.length, 4);
+
+    const cajaFila = Math.floor(paso.celdas[0][0] / 3);
+    const cajaColumna = Math.floor(paso.celdas[0][1] / 3);
+
+    for (const [fila, columna, numero] of paso.eliminados) {
+      // La casilla afectada pertenece a la caja del cuarteto oculto.
+      assert.equal(Math.floor(fila / 3), cajaFila);
+      assert.equal(Math.floor(columna / 3), cajaColumna);
+      assert.ok(paso.celdas.some(([f, c]) => f === fila && c === columna));
+      // Lo eliminado es ajeno al conjunto {1,2,3,4} del cuarteto.
+      assert.ok(!paso.candidatos.includes(numero));
+      // Y nunca es el valor que la solución única tiene en esa casilla.
+      assert.notEqual(numero, solucion[fila][columna]);
+    }
+  }
+
+  // Los números colocados coinciden con la solución independiente.
+  const enJuego = copiarTablero(HIDDEN_QUAD_DESBLOQUEA);
+  for (const paso of pasos) {
+    if (paso.eliminados) continue;
+    assert.ok(esValido(enJuego, paso.fila, paso.columna, paso.numero));
+    assert.equal(paso.numero, solucion[paso.fila][paso.columna]);
+    enJuego[paso.fila][paso.columna] = paso.numero;
+  }
 });
 
 test("las eliminaciones de un hidden quad se conservan entre iteraciones", () => {
