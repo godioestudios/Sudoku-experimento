@@ -6,6 +6,7 @@ import {
   TECNICAS,
   clasificarTablero,
   detectarHiddenPares,
+  detectarHiddenQuads,
   detectarHiddenSingles,
   detectarHiddenTriples,
   detectarNakedPares,
@@ -1585,6 +1586,257 @@ test("detectarHiddenTriples no encuentra nada en un puzzle sin tríos ocultos", 
 });
 
 // ------------------------------------------------------------
+// Hidden quads
+// ------------------------------------------------------------
+
+// Fila 0: falta {2,3,6,8,9}. La columna 8 bloquea (0,8) para 2, 3, 6 y
+// 9, así que esos cuatro números solo caben en (0,1), (0,2), (0,5) y
+// (0,7). El cuarteto oculto {2,3,6,9} elimina el 8 de esas cuatro
+// casillas.
+const HIDDEN_QUAD_FILA = [
+  [1, 0, 0, 4, 5, 0, 7, 0, 0],
+  [0, 0, 0, 0, 0, 0, 0, 0, 0],
+  [0, 0, 0, 0, 0, 0, 0, 0, 0],
+  [0, 0, 0, 0, 0, 0, 0, 0, 2],
+  [0, 0, 0, 0, 0, 0, 0, 0, 3],
+  [0, 0, 0, 0, 0, 0, 0, 0, 6],
+  [0, 0, 0, 0, 0, 0, 0, 0, 9],
+  [0, 0, 0, 0, 0, 0, 0, 0, 0],
+  [0, 0, 0, 0, 0, 0, 0, 0, 0],
+];
+
+// Traspuesta del fixture anterior: el cuarteto está en la columna 0,
+// en (1,0), (2,0), (5,0) y (7,0), y elimina el 8 de las cuatro casillas.
+const HIDDEN_QUAD_COLUMNA = [
+  [1, 0, 0, 0, 0, 0, 0, 0, 0],
+  [0, 0, 0, 0, 0, 0, 0, 0, 0],
+  [0, 0, 0, 0, 0, 0, 0, 0, 0],
+  [4, 0, 0, 0, 0, 0, 0, 0, 0],
+  [5, 0, 0, 0, 0, 0, 0, 0, 0],
+  [0, 0, 0, 0, 0, 0, 0, 0, 0],
+  [7, 0, 0, 0, 0, 0, 0, 0, 0],
+  [0, 0, 0, 0, 0, 0, 0, 0, 0],
+  [0, 0, 0, 2, 3, 6, 9, 0, 0],
+];
+
+// Caja 0: falta {2,3,6,8,9}. Los 2, 3, 6 y 9 de la fila 2 bloquean
+// (2,2), así que esos cuatro números solo caben en (0,0), (0,1), (1,0)
+// y (1,1). El cuarteto oculto {2,3,6,9} elimina el 8 de esas casillas.
+const HIDDEN_QUAD_CAJA = [
+  [0, 0, 1, 0, 0, 0, 0, 0, 0],
+  [0, 0, 4, 0, 0, 0, 0, 0, 0],
+  [5, 7, 0, 2, 3, 6, 9, 0, 0],
+  [0, 0, 0, 0, 0, 0, 0, 0, 0],
+  [0, 0, 0, 0, 0, 0, 0, 0, 0],
+  [0, 0, 0, 0, 0, 0, 0, 0, 0],
+  [0, 0, 0, 0, 0, 0, 0, 0, 0],
+  [0, 0, 0, 0, 0, 0, 0, 0, 0],
+  [0, 0, 0, 0, 0, 0, 0, 0, 0],
+];
+
+// Igual que HIDDEN_QUAD_FILA pero sin el 2 de (3,8): ahora el 2 también
+// cabe en (0,8), de modo que {2,3,6,9} abarca cinco casillas y no llega
+// a formar un cuarteto oculto.
+const HIDDEN_QUAD_CINCO_CELDAS = [
+  [1, 0, 0, 4, 5, 0, 7, 0, 0],
+  [0, 0, 0, 0, 0, 0, 0, 0, 0],
+  [0, 0, 0, 0, 0, 0, 0, 0, 0],
+  [0, 0, 0, 0, 0, 0, 0, 0, 0],
+  [0, 0, 0, 0, 0, 0, 0, 0, 3],
+  [0, 0, 0, 0, 0, 0, 0, 0, 6],
+  [0, 0, 0, 0, 0, 0, 0, 0, 9],
+  [0, 0, 0, 0, 0, 0, 0, 0, 0],
+  [0, 0, 0, 0, 0, 0, 0, 0, 0],
+];
+
+// Fila 0: solo faltan {2,3,6,9} y las cuatro casillas vacías tienen
+// exactamente esos candidatos, así que el cuarteto oculto se detecta
+// pero no elimina ningún candidato.
+const HIDDEN_QUAD_SIN_ELIMINAR = [
+  [1, 0, 0, 4, 5, 0, 7, 8, 0],
+  [0, 0, 0, 0, 0, 0, 0, 0, 0],
+  [0, 0, 0, 0, 0, 0, 0, 0, 0],
+  [0, 0, 0, 0, 0, 0, 0, 0, 0],
+  [0, 0, 0, 0, 0, 0, 0, 0, 0],
+  [0, 0, 0, 0, 0, 0, 0, 0, 0],
+  [0, 0, 0, 0, 0, 0, 0, 0, 0],
+  [0, 0, 0, 0, 0, 0, 0, 0, 0],
+  [0, 0, 0, 0, 0, 0, 0, 0, 0],
+];
+
+test("detectarHiddenQuads encuentra un cuarteto oculto en una fila", () => {
+  const quads = detectarHiddenQuads(HIDDEN_QUAD_FILA);
+  const quad = quads.find(
+    (q) =>
+      q.unidad === "fila" &&
+      q.candidatos.join(",") === "2,3,6,9" &&
+      q.celdas.some(([fila, columna]) => fila === 0 && columna === 1)
+  );
+
+  assert.ok(quad);
+  assert.equal(TECNICAS.HIDDEN_QUAD, "hidden-quad");
+  assert.equal(quad.tecnica, TECNICAS.HIDDEN_QUAD);
+  assert.deepEqual(quad.celdas, [
+    [0, 1],
+    [0, 2],
+    [0, 5],
+    [0, 7],
+  ]);
+  assert.deepEqual(quad.eliminados, [
+    [0, 1, 8],
+    [0, 2, 8],
+    [0, 5, 8],
+    [0, 7, 8],
+  ]);
+});
+
+test("detectarHiddenQuads encuentra un cuarteto oculto en una columna", () => {
+  const quads = detectarHiddenQuads(HIDDEN_QUAD_COLUMNA);
+  const quad = quads.find(
+    (q) =>
+      q.unidad === "columna" &&
+      q.candidatos.join(",") === "2,3,6,9" &&
+      q.celdas.some(([fila, columna]) => fila === 1 && columna === 0)
+  );
+
+  assert.ok(quad);
+  assert.deepEqual(quad.celdas, [
+    [1, 0],
+    [2, 0],
+    [5, 0],
+    [7, 0],
+  ]);
+  assert.deepEqual(quad.eliminados, [
+    [1, 0, 8],
+    [2, 0, 8],
+    [5, 0, 8],
+    [7, 0, 8],
+  ]);
+});
+
+test("detectarHiddenQuads encuentra un cuarteto oculto en una caja", () => {
+  const quads = detectarHiddenQuads(HIDDEN_QUAD_CAJA);
+  const quad = quads.find(
+    (q) =>
+      q.unidad === "caja" &&
+      q.candidatos.join(",") === "2,3,6,9" &&
+      q.celdas.some(([fila, columna]) => fila === 0 && columna === 0)
+  );
+
+  assert.ok(quad);
+  assert.deepEqual(quad.celdas, [
+    [0, 0],
+    [0, 1],
+    [1, 0],
+    [1, 1],
+  ]);
+  assert.deepEqual(quad.eliminados, [
+    [0, 0, 8],
+    [0, 1, 8],
+    [1, 0, 8],
+    [1, 1, 8],
+  ]);
+});
+
+test("detectarHiddenQuads elimina solo los candidatos ajenos al cuarteto", () => {
+  const quad = detectarHiddenQuads(HIDDEN_QUAD_FILA).find(
+    (q) => q.unidad === "fila" && q.candidatos.join(",") === "2,3,6,9"
+  );
+  assert.ok(quad);
+
+  // Tras descontar las eliminaciones, cada una de las cuatro casillas
+  // queda exactamente con los cuatro números del cuarteto.
+  for (const [fila, columna] of quad.celdas) {
+    const restantes = obtenerCandidatos(HIDDEN_QUAD_FILA, fila, columna).filter(
+      (numero) =>
+        !quad.eliminados.some(
+          ([f, c, n]) => f === fila && c === columna && n === numero
+        )
+    );
+    assert.deepEqual(restantes, [2, 3, 6, 9]);
+  }
+
+  // Cada eliminación afecta a una de las cuatro casillas y quita un
+  // candidato que NO pertenece al cuarteto.
+  for (const [fila, columna, numero] of quad.eliminados) {
+    assert.ok(!quad.candidatos.includes(numero));
+    assert.ok(quad.celdas.some(([f, c]) => f === fila && c === columna));
+  }
+});
+
+test("detectarHiddenQuads no detecta un cuarteto si abarca más de cuatro celdas", () => {
+  // El 2 también cabe en (0,8): {2,3,6,9} ocupa cinco casillas.
+  assert.ok(obtenerCandidatos(HIDDEN_QUAD_CINCO_CELDAS, 0, 8).includes(2));
+
+  const quads = detectarHiddenQuads(HIDDEN_QUAD_CINCO_CELDAS);
+  assert.equal(
+    quads.filter(
+      (q) =>
+        q.unidad === "fila" &&
+        q.candidatos.join(",") === "2,3,6,9" &&
+        q.celdas.some(([fila]) => fila === 0)
+    ).length,
+    0
+  );
+});
+
+test("un cuarteto oculto sin eliminaciones reales no se devuelve", () => {
+  // Las cuatro casillas combinan exactamente {2,3,6,9} y no tienen
+  // candidatos adicionales, así que no hay nada que eliminar.
+  for (const [fila, columna] of [
+    [0, 1],
+    [0, 2],
+    [0, 5],
+    [0, 8],
+  ]) {
+    assert.deepEqual(
+      obtenerCandidatos(HIDDEN_QUAD_SIN_ELIMINAR, fila, columna),
+      [2, 3, 6, 9]
+    );
+  }
+
+  const quads = detectarHiddenQuads(HIDDEN_QUAD_SIN_ELIMINAR);
+  assert.equal(
+    quads.filter(
+      (q) => q.unidad === "fila" && q.celdas.some(([fila]) => fila === 0)
+    ).length,
+    0
+  );
+  assert.ok(quads.every((q) => q.eliminados.length > 0));
+});
+
+test("detectarHiddenQuads respeta eliminaciones previas y no las repite", () => {
+  // Ya se descartó el 8 de (0,1): el cuarteto sigue detectándose, pero
+  // solo registra el 8 de las otras tres casillas.
+  const previos = new Set(["0,1,8"]);
+  const quad = detectarHiddenQuads(HIDDEN_QUAD_FILA, previos).find(
+    (q) =>
+      q.unidad === "fila" &&
+      q.candidatos.join(",") === "2,3,6,9" &&
+      q.celdas.some(([fila, columna]) => fila === 0 && columna === 1)
+  );
+
+  assert.ok(quad);
+  assert.deepEqual(quad.eliminados, [
+    [0, 2, 8],
+    [0, 5, 8],
+    [0, 7, 8],
+  ]);
+});
+
+test("detectarHiddenQuads no modifica el tablero original", () => {
+  const original = copiarTablero(HIDDEN_QUAD_FILA);
+  detectarHiddenQuads(HIDDEN_QUAD_FILA);
+  assert.deepEqual(HIDDEN_QUAD_FILA, original);
+});
+
+test("detectarHiddenQuads no produce falsos positivos sin cuartetos", () => {
+  // Las casillas vacías de SIN_TRIPLES están aisladas y cada una tiene un
+  // único candidato: ningún cuarteto puede eliminar nada.
+  assert.deepEqual(detectarHiddenQuads(SIN_TRIPLES), []);
+});
+
+// ------------------------------------------------------------
 // Hidden pairs integrados en resolverLogico
 // ------------------------------------------------------------
 
@@ -2813,6 +3065,329 @@ test("los tableros inválidos siguen clasificándose como inválidos con naked q
     assert.equal(estado, ESTADOS.INVALIDO);
     assert.equal(pasos.length, 0);
     assert.ok(!pasos.some((p) => p.tecnica === TECNICAS.NAKED_QUAD));
+    assert.deepEqual(tablero, original);
+    assert.deepEqual(invalido, original);
+  }
+});
+
+// ------------------------------------------------------------
+// Hidden quads integrados en resolverLogico
+// ------------------------------------------------------------
+
+// Puzzle que queda BLOQUEADO con singles, pares, tríos y naked quads:
+// en la caja 0 el cuarteto oculto {1,2,3,4} ocupa (1,1), (1,2), (2,1) y
+// (2,2), por lo que elimina los candidatos ajenos de esas cuatro
+// casillas. Entre ellos, el 6 de (1,1) y (1,2) deja el 6 como hidden
+// single de la fila 1 en (1,6). Después el solver avanza con otro
+// hidden single, pero vuelve a bloquearse.
+const HIDDEN_QUAD_DESBLOQUEA = [
+  [0, 0, 0, 1, 2, 3, 4, 0, 0],
+  [0, 0, 0, 5, 0, 0, 0, 1, 0],
+  [0, 0, 0, 6, 0, 0, 0, 3, 0],
+  [1, 0, 0, 0, 0, 0, 5, 0, 6],
+  [2, 0, 0, 8, 0, 0, 3, 7, 0],
+  [3, 0, 0, 0, 0, 0, 0, 0, 0],
+  [4, 2, 0, 0, 0, 0, 0, 0, 0],
+  [6, 0, 0, 4, 0, 0, 0, 8, 0],
+  [0, 0, 0, 0, 6, 0, 0, 0, 0],
+];
+
+test("un hidden quad desbloquea un puzzle que antes quedaba bloqueado", () => {
+  const original = copiarTablero(HIDDEN_QUAD_DESBLOQUEA);
+
+  // Con las técnicas anteriores no hay ninguna deducción efectiva.
+  assert.equal(detectarNakedSingles(HIDDEN_QUAD_DESBLOQUEA).length, 0);
+  assert.equal(detectarHiddenSingles(HIDDEN_QUAD_DESBLOQUEA).length, 0);
+  assert.equal(
+    detectarNakedPares(HIDDEN_QUAD_DESBLOQUEA).filter(
+      (p) => p.eliminados.length > 0
+    ).length,
+    0
+  );
+  assert.equal(
+    detectarHiddenPares(HIDDEN_QUAD_DESBLOQUEA).filter(
+      (p) => p.eliminados.length > 0
+    ).length,
+    0
+  );
+  assert.equal(
+    detectarNakedTriples(HIDDEN_QUAD_DESBLOQUEA).filter(
+      (t) => t.eliminados.length > 0
+    ).length,
+    0
+  );
+  assert.equal(
+    detectarHiddenTriples(HIDDEN_QUAD_DESBLOQUEA).filter(
+      (t) => t.eliminados.length > 0
+    ).length,
+    0
+  );
+  assert.equal(
+    detectarNakedQuads(HIDDEN_QUAD_DESBLOQUEA).filter(
+      (q) => q.eliminados.length > 0
+    ).length,
+    0
+  );
+  // ...pero sí hay un hidden quad efectivo.
+  assert.ok(
+    detectarHiddenQuads(HIDDEN_QUAD_DESBLOQUEA).some(
+      (q) => q.eliminados.length > 0
+    )
+  );
+
+  const { estado, pasos, tablero } = resolverLogico(HIDDEN_QUAD_DESBLOQUEA);
+
+  // El primer paso es el cuarteto oculto y el puzzle avanza después.
+  assert.equal(pasos[0].tecnica, TECNICAS.HIDDEN_QUAD);
+  assert.ok(pasos.slice(1).some((p) => !p.eliminados));
+  assert.ok(
+    tablero.flat().filter((v) => v === 0).length <
+      HIDDEN_QUAD_DESBLOQUEA.flat().filter((v) => v === 0).length
+  );
+  // No se resuelve por completo: vuelve a bloquearse tras avanzar.
+  assert.equal(estado, ESTADOS.BLOQUEADO);
+
+  // El tablero original no se modifica
+  assert.deepEqual(HIDDEN_QUAD_DESBLOQUEA, original);
+});
+
+test("las eliminaciones de un hidden quad se conservan entre iteraciones", () => {
+  const { pasos } = resolverLogico(HIDDEN_QUAD_DESBLOQUEA);
+  const indiceQuad = pasos.findIndex(
+    (p) => p.tecnica === TECNICAS.HIDDEN_QUAD
+  );
+  assert.ok(indiceQuad >= 0);
+  assert.ok(pasos[indiceQuad].eliminados.length > 0);
+
+  // Reproducir hasta justo después del cuarteto: los candidatos
+  // descartados siguen registrados y no reaparecen al recalcular.
+  const { enJuego, eliminados } = estadoAntesDe(
+    HIDDEN_QUAD_DESBLOQUEA,
+    pasos,
+    indiceQuad + 1
+  );
+  for (const [fila, columna, numero] of pasos[indiceQuad].eliminados) {
+    assert.ok(eliminados.has(`${fila},${columna},${numero}`));
+    const candidatos = obtenerCandidatos(enJuego, fila, columna).filter(
+      (n) => !eliminados.has(`${fila},${columna},${n}`)
+    );
+    assert.ok(!candidatos.includes(numero));
+  }
+
+  // Ningún paso posterior vuelve a colocar un candidato eliminado.
+  for (let i = indiceQuad + 1; i < pasos.length; i++) {
+    const paso = pasos[i];
+    if (paso.eliminados) continue;
+    assert.ok(
+      !pasos[indiceQuad].eliminados.some(
+        ([fila, columna, numero]) =>
+          fila === paso.fila && columna === paso.columna && numero === paso.numero
+      ),
+      `se colocó un candidato eliminado en (${paso.fila},${paso.columna})`
+    );
+  }
+});
+
+test("una eliminación de hidden quad habilita un single en una iteración posterior", () => {
+  const { pasos } = resolverLogico(HIDDEN_QUAD_DESBLOQUEA);
+  const indiceQuad = pasos.findIndex(
+    (p) => p.tecnica === TECNICAS.HIDDEN_QUAD
+  );
+  assert.ok(indiceQuad >= 0);
+
+  const { enJuego, eliminados } = estadoAntesDe(
+    HIDDEN_QUAD_DESBLOQUEA,
+    pasos,
+    indiceQuad
+  );
+
+  // Antes del cuarteto no hay ningún single.
+  assert.equal(detectarNakedSingles(enJuego, eliminados).length, 0);
+  assert.equal(detectarHiddenSingles(enJuego, eliminados).length, 0);
+
+  // Tras descontar sus eliminaciones aparece un hidden single 6 en (1,6).
+  const conEliminaciones = new Set(eliminados);
+  for (const [fila, columna, numero] of pasos[indiceQuad].eliminados) {
+    conEliminaciones.add(`${fila},${columna},${numero}`);
+  }
+  assert.ok(
+    detectarHiddenSingles(enJuego, conEliminaciones).some(
+      (s) => s.fila === 1 && s.columna === 6 && s.numero === 6
+    )
+  );
+
+  // El solver lo detecta en la iteración siguiente (progreso garantizado)
+  assert.equal(pasos[indiceQuad + 1].tecnica, TECNICAS.HIDDEN_SINGLE);
+  assert.equal(pasos[indiceQuad + 1].fila, 1);
+  assert.equal(pasos[indiceQuad + 1].columna, 6);
+  assert.equal(pasos[indiceQuad + 1].numero, 6);
+});
+
+test("los pasos con hidden quads se reproducen sin contradicciones", () => {
+  const { pasos, tablero } = resolverLogico(HIDDEN_QUAD_DESBLOQUEA);
+
+  const enJuego = copiarTablero(HIDDEN_QUAD_DESBLOQUEA);
+  const eliminados = new Set();
+  let quadsOcultosVistos = 0;
+
+  for (const paso of pasos) {
+    if (
+      paso.tecnica === TECNICAS.NAKED_SINGLE ||
+      paso.tecnica === TECNICAS.HIDDEN_SINGLE
+    ) {
+      assert.ok(
+        esValido(enJuego, paso.fila, paso.columna, paso.numero),
+        `paso contradictorio en (${paso.fila},${paso.columna}) = ${paso.numero}`
+      );
+      enJuego[paso.fila][paso.columna] = paso.numero;
+      continue;
+    }
+
+    // Técnicas de eliminación: no colocan número y eliminan candidatos
+    // que todavía estaban presentes.
+    assert.equal(paso.numero, undefined);
+    assert.ok(paso.eliminados.length > 0);
+
+    let tamano = 2;
+    if (
+      paso.tecnica === TECNICAS.NAKED_TRIPLE ||
+      paso.tecnica === TECNICAS.HIDDEN_TRIPLE
+    ) {
+      tamano = 3;
+    }
+    if (
+      paso.tecnica === TECNICAS.NAKED_QUAD ||
+      paso.tecnica === TECNICAS.HIDDEN_QUAD
+    ) {
+      tamano = 4;
+    }
+    if (paso.tecnica === TECNICAS.HIDDEN_QUAD) quadsOcultosVistos++;
+    assert.equal(paso.celdas.length, tamano);
+    assert.equal(paso.candidatos.length, tamano);
+
+    for (const [fila, columna, numero] of paso.eliminados) {
+      const clave = `${fila},${columna},${numero}`;
+      const candidatos = obtenerCandidatos(enJuego, fila, columna).filter(
+        (n) => !eliminados.has(`${fila},${columna},${n}`)
+      );
+      assert.ok(candidatos.includes(numero), `eliminación inexistente ${clave}`);
+
+      if (
+        paso.tecnica === TECNICAS.HIDDEN_PAIR ||
+        paso.tecnica === TECNICAS.HIDDEN_TRIPLE ||
+        paso.tecnica === TECNICAS.HIDDEN_QUAD
+      ) {
+        // En una técnica oculta lo eliminado NO pertenece al conjunto y
+        // la casilla afectada pertenece a la propia técnica.
+        assert.ok(!paso.candidatos.includes(numero));
+        assert.ok(paso.celdas.some(([f, c]) => f === fila && c === columna));
+      } else {
+        // En una técnica desnuda lo eliminado SON sus números y la
+        // casilla afectada NO pertenece a la técnica.
+        assert.ok(paso.candidatos.includes(numero));
+        assert.ok(!paso.celdas.some(([f, c]) => f === fila && c === columna));
+      }
+
+      eliminados.add(clave);
+    }
+  }
+
+  assert.ok(quadsOcultosVistos > 0);
+  assert.deepEqual(enJuego, tablero);
+  assert.equal(tableroEsValido(tablero), true);
+});
+
+test("las técnicas conservan su prioridad también con hidden quads", () => {
+  const fixtures = [
+    HIDDEN_QUAD_DESBLOQUEA,
+    NAKED_QUAD_DESBLOQUEA,
+    NAKED_QUAD_HABILITA_SINGLE,
+    HIDDEN_TRIPLE_DESBLOQUEA,
+    NAKED_TRIPLE_DESBLOQUEA,
+    HIDDEN_PAIR_DESBLOQUEA,
+    SE_BLOQUEA_DESPUES,
+    RESOLUBLE_SINGLES,
+  ];
+
+  let quadsOcultosVistos = 0;
+
+  for (const fixture of fixtures) {
+    const { pasos } = resolverLogico(fixture);
+    const enJuego = copiarTablero(fixture);
+    const eliminados = new Set();
+
+    for (const paso of pasos) {
+      if (paso.tecnica === TECNICAS.HIDDEN_SINGLE) {
+        assert.equal(detectarNakedSingles(enJuego, eliminados).length, 0);
+      }
+
+      if (paso.eliminados) {
+        // Antes de cualquier técnica de eliminación no debe quedar single
+        assert.equal(detectarNakedSingles(enJuego, eliminados).length, 0);
+        assert.equal(detectarHiddenSingles(enJuego, eliminados).length, 0);
+
+        // El hidden quad es la última técnica: solo se aplica si ninguna
+        // de las anteriores produce una deducción efectiva.
+        if (paso.tecnica === TECNICAS.HIDDEN_QUAD) {
+          quadsOcultosVistos++;
+          assert.equal(
+            detectarNakedPares(enJuego, eliminados).filter(
+              (p) => p.eliminados.length > 0
+            ).length,
+            0
+          );
+          assert.equal(
+            detectarHiddenPares(enJuego, eliminados).filter(
+              (p) => p.eliminados.length > 0
+            ).length,
+            0
+          );
+          assert.equal(
+            detectarNakedTriples(enJuego, eliminados).filter(
+              (t) => t.eliminados.length > 0
+            ).length,
+            0
+          );
+          assert.equal(
+            detectarHiddenTriples(enJuego, eliminados).filter(
+              (t) => t.eliminados.length > 0
+            ).length,
+            0
+          );
+          assert.equal(
+            detectarNakedQuads(enJuego, eliminados).filter(
+              (q) => q.eliminados.length > 0
+            ).length,
+            0
+          );
+        }
+
+        for (const [fila, columna, numero] of paso.eliminados) {
+          eliminados.add(`${fila},${columna},${numero}`);
+        }
+      } else {
+        enJuego[paso.fila][paso.columna] = paso.numero;
+      }
+    }
+  }
+
+  assert.ok(quadsOcultosVistos > 0);
+});
+
+test("los tableros inválidos siguen clasificándose como inválidos con hidden quads", () => {
+  for (const invalido of [
+    DUPLICADO_FILA,
+    DUPLICADO_COLUMNA,
+    DUPLICADO_CAJA,
+    FUERA_DE_RANGO,
+    ESTRUCTURA_ROTA,
+    CASILLA_MUERTA,
+  ]) {
+    const original = copiarTablero(invalido);
+    const { estado, pasos, tablero } = resolverLogico(invalido);
+    assert.equal(estado, ESTADOS.INVALIDO);
+    assert.equal(pasos.length, 0);
+    assert.ok(!pasos.some((p) => p.tecnica === TECNICAS.HIDDEN_QUAD));
     assert.deepEqual(tablero, original);
     assert.deepEqual(invalido, original);
   }

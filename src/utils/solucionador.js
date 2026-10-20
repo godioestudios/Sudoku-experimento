@@ -27,6 +27,7 @@ export const TECNICAS = {
   NAKED_TRIPLE: "naked-triple",
   HIDDEN_TRIPLE: "hidden-triple",
   NAKED_QUAD: "naked-quad",
+  HIDDEN_QUAD: "hidden-quad",
 };
 
 // Estados posibles de un tablero según las técnicas disponibles
@@ -620,6 +621,106 @@ export function detectarHiddenTriples(tablero, eliminados = null) {
 }
 
 /**
+ * Cuartetos ocultos: cuatro números distintos que, dentro de una misma
+ * fila, columna o caja 3×3, pueden colocarse únicamente en las mismas
+ * cuatro casillas vacías. Esas casillas pueden admitir candidatos
+ * adicionales, pero los cuatro números del cuarteto quedan restringidos
+ * a ellas, por lo que se eliminan de las cuatro casillas todos los
+ * candidatos que no sean uno de los cuatro números del cuarteto.
+ *
+ * No coloca ningún número: solo elimina candidatos. Tampoco devuelve
+ * cuartetos que no produzcan ninguna eliminación efectiva.
+ *
+ * @param {Set<string>} [eliminados] - Candidatos descartados por otras
+ *   técnicas; se descuentan al calcular los candidatos.
+ * @returns {{
+ *   tecnica: string,
+ *   unidad: string,
+ *   celdas: [number, number][],
+ *   candidatos: number[],
+ *   eliminados: [number, number, number][]
+ * }[]} Cada cuarteto detectado con al menos una eliminación real.
+ */
+export function detectarHiddenQuads(tablero, eliminados = null) {
+  const quads = [];
+
+  for (const { tipo, celdas } of UNIDADES) {
+    // Candidatos de todas las casillas vacías de la unidad
+    const vacias = celdas
+      .filter(([fila, columna]) => tablero[fila][columna] === 0)
+      .map(([fila, columna]) => ({
+        fila,
+        columna,
+        candidatos: candidatosDe(tablero, fila, columna, eliminados),
+      }));
+
+    if (vacias.length < 4) continue;
+
+    for (let n1 = 1; n1 <= TAMAÑO; n1++) {
+      const conN1 = vacias.filter((celda) => celda.candidatos.includes(n1));
+      if (conN1.length === 0) continue;
+
+      for (let n2 = n1 + 1; n2 <= TAMAÑO; n2++) {
+        const conN2 = vacias.filter((celda) => celda.candidatos.includes(n2));
+        if (conN2.length === 0) continue;
+
+        for (let n3 = n2 + 1; n3 <= TAMAÑO; n3++) {
+          const conN3 = vacias.filter((celda) => celda.candidatos.includes(n3));
+          if (conN3.length === 0) continue;
+
+          for (let n4 = n3 + 1; n4 <= TAMAÑO; n4++) {
+            const conN4 = vacias.filter((celda) =>
+              celda.candidatos.includes(n4)
+            );
+            if (conN4.length === 0) continue;
+
+            // Unión de las casillas donde cabe alguno de los cuatro números
+            const unicas = new Map();
+            for (const celda of [...conN1, ...conN2, ...conN3, ...conN4]) {
+              unicas.set(`${celda.fila},${celda.columna}`, celda);
+            }
+            // Los cuatro números deben quedar restringidos a cuatro casillas
+            if (unicas.size !== 4) continue;
+
+            // Esas cuatro casillas solo pueden alojar el cuarteto: se
+            // descartan de ellas los candidatos ajenos a los cuatro números.
+            const grupo = [...unicas.values()].sort(
+              (a, b) => a.fila - b.fila || a.columna - b.columna
+            );
+            const descartes = [];
+            for (const celda of grupo) {
+              for (const numero of celda.candidatos) {
+                if (
+                  numero !== n1 &&
+                  numero !== n2 &&
+                  numero !== n3 &&
+                  numero !== n4
+                ) {
+                  descartes.push([celda.fila, celda.columna, numero]);
+                }
+              }
+            }
+
+            // Sin eliminaciones reales no hay deducción que registrar
+            if (descartes.length === 0) continue;
+
+            quads.push({
+              tecnica: TECNICAS.HIDDEN_QUAD,
+              unidad: tipo,
+              celdas: grupo.map((celda) => [celda.fila, celda.columna]),
+              candidatos: [n1, n2, n3, n4],
+              eliminados: descartes,
+            });
+          }
+        }
+      }
+    }
+  }
+
+  return quads;
+}
+
+/**
  * Clasificación interna que, a diferencia de clasificarTablero,
  * descuenta los candidatos ya eliminados (por naked/hidden pairs,
  * naked/hidden triples y naked quads) y tiene en cuenta si queda alguna
@@ -655,6 +756,9 @@ function clasificarConEliminaciones(tablero, eliminados) {
   if (detectarNakedQuads(tablero, eliminados).length > 0) {
     return ESTADOS.RESOLUBLE;
   }
+  if (detectarHiddenQuads(tablero, eliminados).length > 0) {
+    return ESTADOS.RESOLUBLE;
+  }
   return ESTADOS.BLOQUEADO;
 }
 
@@ -684,9 +788,9 @@ export function clasificarTablero(tablero) {
 /**
  * Aplica técnicas hasta que no quede ninguna disponible. Prioridad:
  * naked singles, hidden singles y, si no hay singles, naked pairs,
- * luego hidden pairs, luego naked triples, luego hidden triples y por
- * último naked quads (las técnicas de eliminación quitan candidatos y
- * pueden habilitar nuevos singles).
+ * luego hidden pairs, luego naked triples, luego hidden triples, luego
+ * naked quads y por último hidden quads (las técnicas de eliminación
+ * quitan candidatos y pueden habilitar nuevos singles).
  * Recalcula los candidatos tras cada deducción, de modo que cada paso
  * se valida contra el tablero actual: nunca coloca un número que rompa
  * las reglas. Si el tablero de entrada es inválido o contradictorio no
@@ -730,9 +834,9 @@ export function resolverLogico(tablero) {
       } else {
         // Sin singles: aplicar la técnica de eliminación efectiva de
         // mayor prioridad (naked pair → hidden pair → naked triple →
-        // hidden triple → naked quad). Si ninguna elimina candidatos, la
-        // clasificación no habría devuelto "resoluble" y el bucle ya
-        // habría terminado.
+        // hidden triple → naked quad → hidden quad). Si ninguna elimina
+        // candidatos, la clasificación no habría devuelto "resoluble" y
+        // el bucle ya habría terminado.
         let deduccion = detectarNakedPares(copia, eliminados).find(
           (p) => p.eliminados.length > 0
         );
@@ -753,6 +857,11 @@ export function resolverLogico(tablero) {
         }
         if (!deduccion) {
           deduccion = detectarNakedQuads(copia, eliminados).find(
+            (q) => q.eliminados.length > 0
+          );
+        }
+        if (!deduccion) {
+          deduccion = detectarHiddenQuads(copia, eliminados).find(
             (q) => q.eliminados.length > 0
           );
         }
