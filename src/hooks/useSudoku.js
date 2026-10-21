@@ -380,6 +380,17 @@ export function useSudoku() {
   // ----------------------------------------------------------
   useEffect(() => {
     function manejarTeclado(evento) {
+      // No pisamos atajos del navegador/sistema ni la escritura en controles editables
+      if (evento.ctrlKey || evento.metaKey || evento.altKey) return;
+
+      const objetivo = evento.target;
+      if (
+        objetivo?.isContentEditable ||
+        /^(INPUT|TEXTAREA|SELECT)$/.test(objetivo?.tagName ?? "")
+      ) {
+        return;
+      }
+
       if (!activa) return;
 
       // Con la partida en pausa, la tecla P reanuda y nada más se procesa

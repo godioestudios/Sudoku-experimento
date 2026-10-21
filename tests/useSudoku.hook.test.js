@@ -158,6 +158,17 @@ function ejecutar(accion) {
   act(() => accion());
 }
 
+function presionar(key, opciones = {}, objetivo = document) {
+  const evento = new window.KeyboardEvent("keydown", {
+    key,
+    bubbles: true,
+    cancelable: true,
+    ...opciones,
+  });
+  act(() => objetivo.dispatchEvent(evento));
+  return evento;
+}
+
 function completarGeneracion(trabajador, partida) {
   act(() => {
     trabajador.emitirMensaje({ id: trabajador.enviado.id, partida });
@@ -627,4 +638,101 @@ test("una generación inicial fallida deja el juego sin partida pero listo para 
   assert.equal(resultado.current.generando, false);
   assert.equal(resultado.current.listo, true);
   assert.deepEqual(resultado.current.tableroJuego, partida.tableroJuego);
+});
+
+test("los atajos normales N, H y Z siguen funcionando", (t) => {
+  const { workers, montar } = preparar(t);
+  const { resultado } = montar();
+  const partida = crearPartida([[0, 0], [0, 1]]);
+
+  t.mock.method(Math, "random", () => 0);
+  completarGeneracion(workers.instancias[0], partida);
+
+  presionar("n");
+  assert.equal(resultado.current.modoNotas, true);
+  presionar("N");
+  assert.equal(resultado.current.modoNotas, false);
+
+  presionar("h");
+  assert.equal(
+    resultado.current.tableroJuego[0][0],
+    partida.tableroSolucion[0][0]
+  );
+  assert.equal(resultado.current.deshacerDisponible, true);
+
+  presionar("z");
+  assert.equal(resultado.current.tableroJuego[0][0], 0);
+  assert.equal(resultado.current.deshacerDisponible, false);
+});
+
+test("los atajos se ignoran con Ctrl, Meta o Alt y no bloquean al navegador", (t) => {
+  const { workers, montar } = preparar(t);
+  const { resultado } = montar();
+  const partida = crearPartida([[0, 0]]);
+
+  completarGeneracion(workers.instancias[0], partida);
+  ejecutar(() => resultado.current.seleccionarCelda(0, 0));
+
+  for (const modificador of ["ctrlKey", "metaKey", "altKey"]) {
+    for (const key of ["n", "h", "z", "p"]) {
+      const evento = presionar(key, { [modificador]: true });
+      assert.equal(evento.defaultPrevented, false);
+    }
+  }
+
+  assert.equal(resultado.current.modoNotas, false);
+  assert.equal(resultado.current.pausado, false);
+  assert.equal(resultado.current.tableroJuego[0][0], 0);
+  assert.equal(resultado.current.deshacerDisponible, false);
+
+  const flecha = presionar("ArrowDown", { ctrlKey: true });
+  assert.equal(flecha.defaultPrevented, false);
+  assert.deepEqual(resultado.current.seleccion, { fila: 0, columna: 0 });
+});
+
+test("los atajos se ignoran en controles editables", (t) => {
+  const { workers, montar } = preparar(t);
+  const { resultado } = montar();
+  const partida = crearPartida([[0, 0]]);
+
+  completarGeneracion(workers.instancias[0], partida);
+  ejecutar(() => resultado.current.seleccionarCelda(0, 0));
+
+  for (const etiqueta of ["input", "textarea"]) {
+    const control = document.createElement(etiqueta);
+    document.body.appendChild(control);
+
+    presionar("n", {}, control);
+    presionar("h", {}, control);
+    presionar("z", {}, control);
+    presionar("p", {}, control);
+
+    control.remove();
+  }
+
+  assert.equal(resultado.current.modoNotas, false);
+  assert.equal(resultado.current.pausado, false);
+  assert.equal(resultado.current.tableroJuego[0][0], 0);
+  assert.equal(resultado.current.deshacerDisponible, false);
+});
+
+test("al desmontar se elimina el listener de teclado", (t) => {
+  const { workers, montar } = preparar(t);
+  const { resultado, desmontar } = montar();
+  const partida = crearPartida([[0, 0]]);
+
+  completarGeneracion(workers.instancias[0], partida);
+  ejecutar(() => resultado.current.seleccionarCelda(0, 0));
+
+  desmontar();
+
+  presionar("n");
+  presionar("h");
+  presionar("z");
+  presionar("p");
+
+  assert.equal(resultado.current.modoNotas, false);
+  assert.equal(resultado.current.pausado, false);
+  assert.equal(resultado.current.tableroJuego[0][0], 0);
+  assert.equal(resultado.current.deshacerDisponible, false);
 });
