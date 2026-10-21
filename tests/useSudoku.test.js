@@ -139,3 +139,60 @@ test("conteo de dígitos: no suma colocaciones incorrectas a un dígito incomple
   assert.equal(conteo[5], 3);
   assert.equal(9 - conteo[5], 6);
 });
+
+test("resolverGeneracion informa que la dificultad pedida no está garantizada", () => {
+  const nueva = {
+    tableroJuego: [[0]],
+    tableroSolucion: [[1]],
+    dificultadLogica: {
+      solicitada: "experto",
+      alcanzada: false,
+      motivo: "dificultad",
+      nivel: 0,
+      nombre: "facil",
+      etiqueta: "Fácil",
+      verificado: true,
+      vacias: 56,
+      vaciasObjetivo: 56,
+    },
+  };
+
+  const resultado = resolverGeneracion({
+    id: 4,
+    idVigente: 4,
+    partidaAnterior,
+    respuesta: { id: 4, partida: nueva },
+  });
+
+  assert.match(
+    resultado.estado,
+    /Dificultad Experto no garantizada: el puzzle generado es Fácil\./
+  );
+});
+
+test("resolverGeneracion menciona el presupuesto agotado", () => {
+  const nueva = {
+    tableroJuego: [[0]],
+    tableroSolucion: [[1]],
+    dificultadLogica: {
+      solicitada: "experto",
+      alcanzada: false,
+      motivo: "presupuesto",
+      nivel: 0,
+      nombre: "facil",
+      etiqueta: "Fácil",
+      verificado: true,
+      vacias: 54,
+      vaciasObjetivo: 56,
+    },
+  };
+
+  const resultado = resolverGeneracion({
+    id: 5,
+    idVigente: 5,
+    partidaAnterior,
+    respuesta: { id: 5, partida: nueva },
+  });
+
+  assert.match(resultado.estado, /Se agotó el presupuesto de generación\./);
+});

@@ -158,6 +158,26 @@ function ejecutar(accion) {
   act(() => accion());
 }
 
+// Reloj monotónico controlado: mueve performance.now() y dispara los intervalos.
+function instalarRelojSimulado(t) {
+  t.mock.timers.enable({ apis: ["setInterval"] });
+  t.after(() => t.mock.timers.reset());
+
+  let ahoraMs = 0;
+  t.mock.method(performance, "now", () => ahoraMs);
+
+  return {
+    avanzar(ms) {
+      ahoraMs += ms;
+      act(() => t.mock.timers.tick(ms));
+    },
+    // Solo mueve el reloj, como una pestaña en segundo plano sin timers.
+    avanzarReloj(ms) {
+      ahoraMs += ms;
+    },
+  };
+}
+
 function presionar(key, opciones = {}, objetivo = document) {
   const evento = new window.KeyboardEvent("keydown", {
     key,
@@ -205,6 +225,31 @@ test("inicia una partida en dificultad media y aplica la generación", (t) => {
   assert.equal(resultado.current.errores, 0);
   assert.equal(resultado.current.seleccion, null);
   assert.equal(resultado.current.deshacerDisponible, false);
+});
+
+test("la etiqueta de dificultad refleja el resultado lógico del motor", (t) => {
+  const { workers, montar } = preparar(t);
+  const { resultado } = montar();
+  const partida = {
+    ...crearPartida([[0, 0]]),
+    dificultadLogica: {
+      solicitada: "experto",
+      alcanzada: false,
+      motivo: "dificultad",
+      nivel: 0,
+      nombre: "facil",
+      etiqueta: "Fácil",
+      verificado: true,
+      vacias: 56,
+      vaciasObjetivo: 56,
+    },
+  };
+
+  completarGeneracion(workers.instancias[0], partida);
+
+  assert.equal(resultado.current.etiquetaDificultad, "Fácil");
+  assert.equal(resultado.current.dificultad, "medio");
+  assert.match(resultado.current.estado, /no garantizada/);
 });
 
 test("listo se apaga durante una nueva generación y se recupera al terminar o fallar", (t) => {
@@ -270,6 +315,15 @@ test("cambiar de dificultad reinicia el progreso y descarta respuestas obsoletas
 
   ejecutar(() => resultado.current.cambiarDificultad("dificil"));
 
+  assert.deepEqual(resultado.current.confirmacionPendiente, { nivel: "dificil" });
+  assert.equal(resultado.current.dificultad, "medio");
+  assert.equal(resultado.current.generando, false);
+  assert.equal(workers.instancias.length, 1);
+  assert.deepEqual(resultado.current.tableroJuego, tableroConProgreso);
+
+  ejecutar(() => resultado.current.confirmarNuevoJuego());
+
+  assert.equal(resultado.current.confirmacionPendiente, null);
   assert.equal(resultado.current.dificultad, "dificil");
   assert.equal(resultado.current.generando, true);
   assert.equal(resultado.current.pausado, false);
@@ -292,6 +346,139 @@ test("cambiar de dificultad reinicia el progreso y descarta respuestas obsoletas
   assert.equal(resultado.current.seleccion, null);
   assert.equal(resultado.current.modoNotas, false);
   assert.equal(resultado.current.deshacerDisponible, false);
+});
+
+test("una partida sin progreso se reemplaza sin pedir confirmación", (t) => {
+  const { workers, montar } = preparar(t);
+  const { resultado } = montar();
+  const partida = crearPartida([[0, 0]]);
+
+  completarGeneracion(workers.instancias[0], partida);
+
+  ejecutar(() => resultado.current.nuevoJuego());
+
+  assert.equal(resultado.current.confirmacionPendiente, null);
+  assert.equal(resultado.current.generando, true);
+  assert.equal(workers.instancias.length, 2);
+  assert.equal(workers.instancias[0].terminado, true);
+  assert.deepEqual(workers.instancias[1].enviado, { id: 2, nivel: "medio" });
+});
+
+test("una partida con progreso pide confirmación y la aceptación inicia una sola generación", (t) => {
+  const { workers, montar } = preparar(t);
+  const { resultado } = montar();
+  const partida = crearPartida([[0, 0]]);
+
+  completarGeneracion(workers.instancias[0], partida);
+  ejecutar(() => resultado.current.seleccionarCelda(0, 0));
+  ejecutar(() => resultado.current.colocarNumero(9));
+  const tableroConProgreso = resultado.current.tableroJuego.map((fila) => [...fila]);
+
+  ejecutar(() => resultado.current.nuevoJuego());
+
+  assert.deepEqual(resultado.current.confirmacionPendiente, { nivel: "medio" });
+  assert.equal(resultado.current.generando, false);
+  assert.equal(workers.instancias.length, 1);
+  assert.deepEqual(resultado.current.tableroJuego, tableroConProgreso);
+
+  ejecutar(() => resultado.current.confirmarNuevoJuego());
+  ejecutar(() => resultado.current.confirmarNuevoJuego());
+
+  assert.equal(resultado.current.confirmacionPendiente, null);
+  assert.equal(resultado.current.generando, true);
+  assert.equal(workers.instancias.length, 2);
+  assert.equal(workers.instancias[0].terminado, true);
+
+  const nueva = crearPartida([[1, 1]]);
+  completarGeneracion(workers.instancias[1], nueva);
+
+  assert.deepEqual(resultado.current.tableroJuego, nueva.tableroJuego);
+  assert.equal(resultado.current.errores, 0);
+  assert.equal(resultado.current.deshacerDisponible, false);
+});
+
+test("cancelar la confirmación conserva tablero, apuntes, errores, cronómetro y pausa", (t) => {
+  const reloj = instalarRelojSimulado(t);
+
+  const { workers, montar } = preparar(t);
+  const { resultado } = montar();
+  const partida = crearPartida([[0, 0], [0, 1]]);
+
+  completarGeneracion(workers.instancias[0], partida);
+  reloj.avanzar(2000);
+
+  ejecutar(() => resultado.current.seleccionarCelda(0, 0));
+  ejecutar(() => resultado.current.colocarNumero(9));
+  ejecutar(() => resultado.current.alternarNotas());
+  ejecutar(() => resultado.current.seleccionarCelda(0, 1));
+  ejecutar(() => resultado.current.colocarNumero(3));
+  ejecutar(() => resultado.current.pausar());
+
+  const tableroAntes = resultado.current.tableroJuego.map((fila) => [...fila]);
+  const apuntesAntes = [...resultado.current.notas[0][1]];
+  assert.equal(resultado.current.errores, 1);
+  assert.equal(resultado.current.segundos, 2);
+  assert.equal(resultado.current.pausado, true);
+
+  ejecutar(() => resultado.current.cambiarDificultad("dificil"));
+
+  assert.deepEqual(resultado.current.confirmacionPendiente, { nivel: "dificil" });
+  assert.equal(resultado.current.dificultad, "medio");
+  assert.equal(resultado.current.generando, false);
+  assert.equal(workers.instancias.length, 1);
+
+  ejecutar(() => resultado.current.cancelarNuevoJuego());
+
+  assert.equal(resultado.current.confirmacionPendiente, null);
+  assert.equal(resultado.current.dificultad, "medio");
+  assert.deepEqual(resultado.current.tableroJuego, tableroAntes);
+  assert.deepEqual([...resultado.current.notas[0][1]], apuntesAntes);
+  assert.equal(resultado.current.errores, 1);
+  assert.equal(resultado.current.segundos, 2);
+  assert.equal(resultado.current.pausado, true);
+  assert.equal(resultado.current.generando, false);
+  assert.equal(workers.instancias.length, 1);
+});
+
+test("volver a elegir la dificultad actual sin progreso no pide confirmación", (t) => {
+  const { workers, montar } = preparar(t);
+  const { resultado } = montar();
+  const partida = crearPartida([[0, 0]]);
+
+  completarGeneracion(workers.instancias[0], partida);
+
+  ejecutar(() => resultado.current.cambiarDificultad("medio"));
+
+  assert.equal(resultado.current.confirmacionPendiente, null);
+  assert.equal(resultado.current.dificultad, "medio");
+  assert.equal(resultado.current.generando, true);
+  assert.equal(workers.instancias.length, 2);
+  assert.deepEqual(workers.instancias[1].enviado, { id: 2, nivel: "medio" });
+});
+
+test("una nueva partida durante una generación cancela la anterior sin confirmar", (t) => {
+  const { workers, montar } = preparar(t);
+  const { resultado } = montar();
+
+  assert.equal(resultado.current.generando, true);
+  assert.equal(workers.instancias.length, 1);
+
+  ejecutar(() => resultado.current.nuevoJuego("facil"));
+
+  assert.equal(resultado.current.confirmacionPendiente, null);
+  assert.equal(resultado.current.generando, true);
+  assert.equal(workers.instancias.length, 2);
+  assert.equal(workers.instancias[0].terminado, true);
+  assert.deepEqual(workers.instancias[1].enviado, { id: 2, nivel: "facil" });
+
+  completarGeneracion(workers.instancias[0], crearPartida([[1, 1]]));
+  assert.equal(resultado.current.generando, true);
+
+  const nueva = crearPartida([[2, 2]]);
+  completarGeneracion(workers.instancias[1], nueva);
+
+  assert.equal(resultado.current.generando, false);
+  assert.deepEqual(resultado.current.tableroJuego, nueva.tableroJuego);
 });
 
 test("dos llamadas rápidas a nuevoJuego solo aplican la última", (t) => {
@@ -561,17 +748,147 @@ test("darPista revela la solución en una casilla vacía", (t) => {
   t.mock.method(Math, "random", () => 0);
   completarGeneracion(workers.instancias[0], partida);
 
+  assert.equal(resultado.current.pistasRestantes, 3);
+
   ejecutar(() => resultado.current.seleccionarCelda(1, 1));
   ejecutar(() => resultado.current.darPista());
 
   assert.equal(resultado.current.tableroJuego[0][0], solucion[0][0]);
   assert.deepEqual(resultado.current.seleccion, { fila: 0, columna: 0 });
   assert.equal(resultado.current.deshacerDisponible, true);
+  assert.equal(resultado.current.pistasRestantes, 2);
 
   ejecutar(() => resultado.current.darPista());
   assert.equal(resultado.current.tableroJuego[0][1], solucion[0][1]);
   assert.equal(resultado.current.deshacerDisponible, true);
+  assert.equal(resultado.current.pistasRestantes, 1);
   assert.equal(resultado.current.victoria, true);
+});
+
+test("darPista sobre una casilla vacía seleccionada consume una pista", (t) => {
+  const { workers, montar } = preparar(t);
+  const { resultado } = montar();
+  const partida = crearPartida([[0, 0], [0, 1]]);
+
+  completarGeneracion(workers.instancias[0], partida);
+  ejecutar(() => resultado.current.seleccionarCelda(0, 0));
+  ejecutar(() => resultado.current.darPista());
+
+  assert.equal(resultado.current.tableroJuego[0][0], partida.tableroSolucion[0][0]);
+  assert.equal(resultado.current.tableroJuego[0][1], 0);
+  assert.equal(resultado.current.pistasRestantes, 2);
+});
+
+test("darPista no sobrescribe un valor incorrecto del usuario ni consume pista", (t) => {
+  const { workers, montar } = preparar(t);
+  const { resultado } = montar();
+  const partida = crearPartida([[0, 0]]);
+  const solucion = partida.tableroSolucion[0][0];
+  const incorrecto = solucion === 9 ? 1 : solucion + 1;
+
+  completarGeneracion(workers.instancias[0], partida);
+  ejecutar(() => resultado.current.seleccionarCelda(0, 0));
+  ejecutar(() => resultado.current.colocarNumero(incorrecto));
+
+  ejecutar(() => resultado.current.darPista());
+
+  assert.equal(resultado.current.tableroJuego[0][0], incorrecto);
+  assert.deepEqual(resultado.current.seleccion, { fila: 0, columna: 0 });
+  assert.match(resultado.current.estado, /incorrecto/i);
+  assert.equal(resultado.current.pistasRestantes, 3);
+});
+
+test("darPista no modifica las casillas originales", (t) => {
+  const { workers, montar } = preparar(t);
+  const { resultado } = montar();
+  const partida = crearPartida([[0, 0]]);
+
+  t.mock.method(Math, "random", () => 0);
+  completarGeneracion(workers.instancias[0], partida);
+  ejecutar(() => resultado.current.seleccionarCelda(1, 1));
+  ejecutar(() => resultado.current.darPista());
+
+  assert.equal(resultado.current.tableroJuego[1][1], partida.tableroSolucion[1][1]);
+  assert.equal(resultado.current.tableroJuego[0][0], partida.tableroSolucion[0][0]);
+  assert.equal(resultado.current.pistasRestantes, 2);
+});
+
+test("al agotarse las pistas la acción no modifica el tablero", (t) => {
+  const { workers, montar } = preparar(t);
+  const { resultado } = montar();
+  const partida = crearPartida([[0, 0], [0, 1], [0, 2], [0, 3]]);
+
+  t.mock.method(Math, "random", () => 0);
+  completarGeneracion(workers.instancias[0], partida);
+
+  ejecutar(() => resultado.current.darPista());
+  ejecutar(() => resultado.current.darPista());
+  ejecutar(() => resultado.current.darPista());
+  assert.equal(resultado.current.pistasRestantes, 0);
+
+  const tableroAntes = resultado.current.tableroJuego.map((fila) => [...fila]);
+  ejecutar(() => resultado.current.darPista());
+
+  assert.equal(resultado.current.pistasRestantes, 0);
+  assert.deepEqual(resultado.current.tableroJuego, tableroAntes);
+  assert.equal(resultado.current.tableroJuego[0][3], 0);
+  assert.match(resultado.current.estado, /No quedan pistas disponibles/);
+});
+
+test("una pista no consumida se conserva si la acción no puede ejecutarse", (t) => {
+  const { workers, montar } = preparar(t);
+  const { resultado } = montar();
+  const partida = crearPartida();
+  const incorrecto = partida.tableroSolucion[0][0] === 9 ? 1 : partida.tableroSolucion[0][0] + 1;
+  partida.tableroJuego[0][0] = incorrecto;
+
+  completarGeneracion(workers.instancias[0], partida);
+
+  const tableroAntes = resultado.current.tableroJuego.map((fila) => [...fila]);
+  ejecutar(() => resultado.current.darPista());
+
+  assert.deepEqual(resultado.current.tableroJuego, tableroAntes);
+  assert.equal(resultado.current.pistasRestantes, 3);
+  assert.match(resultado.current.estado, /No quedan casillas vacías/);
+});
+
+test("reiniciar la partida recarga el límite de pistas", (t) => {
+  const { workers, montar } = preparar(t);
+  const { resultado } = montar();
+  const partida = crearPartida([[0, 0], [0, 1]]);
+
+  completarGeneracion(workers.instancias[0], partida);
+  ejecutar(() => resultado.current.seleccionarCelda(0, 0));
+  ejecutar(() => resultado.current.darPista());
+  assert.equal(resultado.current.pistasRestantes, 2);
+
+  ejecutar(() => resultado.current.nuevoJuego());
+  ejecutar(() => resultado.current.confirmarNuevoJuego());
+
+  const nueva = crearPartida([[1, 1]]);
+  completarGeneracion(workers.instancias[1], nueva);
+
+  assert.equal(resultado.current.pistasRestantes, 3);
+});
+
+test("deshacer una pista restaura el tablero pero no devuelve la pista", (t) => {
+  const { workers, montar } = preparar(t);
+  const { resultado } = montar();
+  const partida = crearPartida([[0, 0], [0, 1]]);
+
+  completarGeneracion(workers.instancias[0], partida);
+  ejecutar(() => resultado.current.seleccionarCelda(0, 0));
+  ejecutar(() => resultado.current.darPista());
+  assert.equal(resultado.current.pistasRestantes, 2);
+
+  ejecutar(() => resultado.current.deshacer());
+
+  assert.equal(resultado.current.tableroJuego[0][0], 0);
+  assert.equal(resultado.current.pistasRestantes, 2);
+  assert.equal(resultado.current.deshacerDisponible, false);
+
+  ejecutar(() => resultado.current.darPista());
+  assert.equal(resultado.current.pistasRestantes, 1);
 });
 
 test("darPista avisa cuando no quedan casillas vacías", (t) => {
@@ -620,32 +937,111 @@ test("la pausa bloquea acciones y la reanudación las habilita", (t) => {
 });
 
 test("el cronómetro avanza solo con la partida activa y sin pausa", (t) => {
-  t.mock.timers.enable({ apis: ["setInterval"] });
-  t.after(() => t.mock.timers.reset());
+  const reloj = instalarRelojSimulado(t);
 
   const { workers, montar } = preparar(t);
   const { resultado } = montar();
   const partida = crearPartida([[0, 0]]);
 
-  act(() => t.mock.timers.tick(3000));
+  reloj.avanzar(3000);
   assert.equal(resultado.current.segundos, 0);
 
   completarGeneracion(workers.instancias[0], partida);
-  act(() => t.mock.timers.tick(3000));
+  reloj.avanzar(3000);
   assert.equal(resultado.current.segundos, 3);
 
   ejecutar(() => resultado.current.pausar());
-  act(() => t.mock.timers.tick(5000));
+  reloj.avanzar(5000);
   assert.equal(resultado.current.segundos, 3);
 
   ejecutar(() => resultado.current.reanudar());
-  act(() => t.mock.timers.tick(2000));
+  reloj.avanzar(2000);
   assert.equal(resultado.current.segundos, 5);
 });
 
+test("el cronómetro mide tiempo real aunque el intervalo se atrase", (t) => {
+  const reloj = instalarRelojSimulado(t);
+
+  const { workers, montar } = preparar(t);
+  const { resultado } = montar();
+
+  completarGeneracion(workers.instancias[0], crearPartida([[0, 0]]));
+
+  // Simula una pestaña en segundo plano: el reloj avanza 4 s pero el intervalo
+  // no se ejecuta. Al dispararse una sola vez debe reflejar los 5 s reales.
+  reloj.avanzarReloj(4000);
+  reloj.avanzar(1000);
+
+  assert.equal(resultado.current.segundos, 5);
+});
+
+test("pausar y reanudar varias veces no duplica intervalos ni cuenta la pausa", (t) => {
+  const reloj = instalarRelojSimulado(t);
+
+  const { workers, montar } = preparar(t);
+  const { resultado } = montar();
+
+  completarGeneracion(workers.instancias[0], crearPartida([[0, 0]]));
+
+  reloj.avanzar(1000);
+  assert.equal(resultado.current.segundos, 1);
+
+  ejecutar(() => resultado.current.pausar());
+  reloj.avanzar(5000);
+  assert.equal(resultado.current.segundos, 1);
+
+  ejecutar(() => resultado.current.reanudar());
+  reloj.avanzar(2000);
+  assert.equal(resultado.current.segundos, 3);
+
+  ejecutar(() => resultado.current.pausar());
+  reloj.avanzar(5000);
+  assert.equal(resultado.current.segundos, 3);
+
+  ejecutar(() => resultado.current.reanudar());
+  reloj.avanzar(1000);
+  assert.equal(resultado.current.segundos, 4);
+});
+
+test("iniciar una partida nueva reinicia el cronómetro", (t) => {
+  const reloj = instalarRelojSimulado(t);
+
+  const { workers, montar } = preparar(t);
+  const { resultado } = montar();
+
+  completarGeneracion(workers.instancias[0], crearPartida([[0, 0]]));
+  reloj.avanzar(3000);
+  assert.equal(resultado.current.segundos, 3);
+
+  ejecutar(() => resultado.current.nuevoJuego());
+  assert.equal(resultado.current.segundos, 0);
+  assert.equal(resultado.current.generando, true);
+
+  completarGeneracion(workers.instancias[1], crearPartida([[1, 1]]));
+  reloj.avanzar(2000);
+  assert.equal(resultado.current.segundos, 2);
+});
+
+test("un cambio del reloj del sistema no altera el cronómetro", (t) => {
+  const reloj = instalarRelojSimulado(t);
+
+  const { workers, montar } = preparar(t);
+  const { resultado } = montar();
+
+  completarGeneracion(workers.instancias[0], crearPartida([[0, 0]]));
+  reloj.avanzar(1000);
+  assert.equal(resultado.current.segundos, 1);
+
+  // El reloj de pared salta una hora; performance.now() sigue siendo monotónico.
+  const relojDePared = Date.now;
+  t.mock.method(Date, "now", () => relojDePared() + 60 * 60 * 1000);
+  reloj.avanzar(1000);
+
+  assert.equal(resultado.current.segundos, 2);
+});
+
 test("detecta la victoria al completar la última casilla y detiene el cronómetro", (t) => {
-  t.mock.timers.enable({ apis: ["setInterval"] });
-  t.after(() => t.mock.timers.reset());
+  const reloj = instalarRelojSimulado(t);
 
   const { workers, montar } = preparar(t);
   const { resultado } = montar();
@@ -653,7 +1049,7 @@ test("detecta la victoria al completar la última casilla y detiene el cronómet
 
   completarGeneracion(workers.instancias[0], partida);
 
-  act(() => t.mock.timers.tick(1000));
+  reloj.avanzar(1000);
   assert.equal(resultado.current.segundos, 1);
   assert.equal(resultado.current.victoria, false);
 
@@ -663,7 +1059,7 @@ test("detecta la victoria al completar la última casilla y detiene el cronómet
   assert.equal(resultado.current.victoria, true);
   assert.equal(resultado.current.estado, "¡Sudoku completado!");
 
-  act(() => t.mock.timers.tick(5000));
+  reloj.avanzar(5000);
   assert.equal(resultado.current.segundos, 1);
 
   ejecutar(() => resultado.current.seleccionarCelda(0, 0));

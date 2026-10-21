@@ -257,16 +257,34 @@ function esSolucionCompleta(tablero) {
  * intentos o al consumir el presupuesto de tiempo, para no demorar
  * innecesariamente la generación.
  *
+ * `evaluar` y `aceptar` permiten exigir además un criterio lógico.
+ * `alcanzado` solo es true si se cumplen las casillas vacías Y el
+ * criterio lógico. Si no, se devuelve el mejor intento con el motivo
+ * ("dificultad", "presupuesto" o "intentos") para que la interfaz no
+ * presente la dificultad como garantizada.
+ *
  * Nota: "vacías" mide casillas vacías, no dificultad lógica real;
  * un puzzle con 56 vacías puede ser más fácil de resolver que otro
  * con menos si sus técnicas de deducción son más directas.
  *
  * @param {number[][]} tableroResuelto - Solución completa (no se modifica).
  * @param {number} objetivoVacias - Entero entre 0 y 81 (casillas vacías deseadas).
- * @param {{maxIntentos?: number, presupuestoMs?: number}} opciones
+ * @param {{
+ *   maxIntentos?: number,
+ *   presupuestoMs?: number,
+ *   evaluar?: (puzzle: number[][]) => object,
+ *   aceptar?: (evaluacion: object) => boolean
+ * }} opciones
+ * @returns {{
+ *   puzzle: number[][],
+ *   vacias: number,
+ *   evaluacion: object|null,
+ *   alcanzado: boolean,
+ *   motivo: "objetivo"|"dificultad"|"presupuesto"|"intentos"
+ * }}
  * @throws {TypeError} Si el objetivo no es un entero dentro del rango.
  */
-export function crearPuzzle(tableroResuelto, objetivoVacias, opciones = {}) {
+export function crearPuzzleConResultado(tableroResuelto, objetivoVacias, opciones = {}) {
   if (
     !Number.isInteger(objetivoVacias) ||
     objetivoVacias < 0 ||
@@ -285,25 +303,78 @@ export function crearPuzzle(tableroResuelto, objetivoVacias, opciones = {}) {
 
   const maxIntentos = Math.max(1, opciones.maxIntentos ?? 5);
   const presupuestoMs = opciones.presupuestoMs ?? 3000;
+  const evaluar =
+    typeof opciones.evaluar === "function" ? opciones.evaluar : null;
+  const aceptar =
+    typeof opciones.aceptar === "function" ? opciones.aceptar : () => true;
   const inicio = performance.now();
 
-  let mejorPuzzle = null;
-  let mejorVacias = -1;
+  let mejor = null;
+  let presupuestoAgotado = false;
 
   for (let intento = 0; intento < maxIntentos; intento++) {
     // El primer intento corre siempre; los demás solo si queda presupuesto
-    if (intento > 0 && performance.now() - inicio >= presupuestoMs) break;
-    if (mejorVacias >= objetivoVacias) break;
+    if (intento > 0 && performance.now() - inicio >= presupuestoMs) {
+      presupuestoAgotado = true;
+      break;
+    }
 
     const { puzzle, vacias } = intentoDeVaciado(tableroResuelto, objetivoVacias);
+    const evaluacion = evaluar ? evaluar(puzzle) : null;
+    const cumpleLogica = !evaluar || aceptar(evaluacion);
+    const cumpleVacias = vacias >= objetivoVacias;
+    const candidato = { puzzle, vacias, evaluacion, cumpleLogica };
 
-    if (vacias > mejorVacias) {
-      mejorPuzzle = puzzle;
-      mejorVacias = vacias;
+    if (cumpleVacias && cumpleLogica) {
+      return {
+        puzzle,
+        vacias,
+        evaluacion,
+        alcanzado: true,
+        motivo: "objetivo",
+      };
+    }
+
+    if (
+      !mejor ||
+      (cumpleLogica && !mejor.cumpleLogica) ||
+      (cumpleLogica === mejor.cumpleLogica &&
+        (vacias > mejor.vacias ||
+          (vacias === mejor.vacias &&
+            (evaluacion?.nivel ?? -1) > (mejor.evaluacion?.nivel ?? -1))))
+    ) {
+      mejor = candidato;
     }
   }
 
-  return mejorPuzzle;
+  if (!presupuestoAgotado && performance.now() - inicio >= presupuestoMs) {
+    presupuestoAgotado = true;
+  }
+
+  const cumpleVacias = mejor.vacias >= objetivoVacias;
+  const motivo = cumpleVacias
+    ? "dificultad"
+    : presupuestoAgotado
+      ? "presupuesto"
+      : "intentos";
+
+  return {
+    puzzle: mejor.puzzle,
+    vacias: mejor.vacias,
+    evaluacion: mejor.evaluacion,
+    alcanzado: false,
+    motivo,
+  };
+}
+
+/**
+ * Variante histórica que devuelve solo la matriz del puzzle. Mantiene
+ * el mismo comportamiento y añade los criterios opcionales de
+ * crearPuzzleConResultado.
+ */
+export function crearPuzzle(tableroResuelto, objetivoVacias, opciones = {}) {
+  return crearPuzzleConResultado(tableroResuelto, objetivoVacias, opciones)
+    .puzzle;
 }
 
 // ============================================================

@@ -39,6 +39,11 @@ test("procesarSolicitud responde con el id y una partida válida", () => {
   for (const fila of partida.notas) {
     for (const candidatos of fila) assert.equal(candidatos.size, 0);
   }
+
+  assert.equal(partida.dificultadLogica.solicitada, "facil");
+  assert.equal(partida.dificultadLogica.alcanzada, true);
+  assert.equal(partida.dificultadLogica.motivo, "objetivo");
+  assert.equal(partida.dificultadLogica.etiqueta, "Fácil");
 });
 
 test("procesarSolicitud devuelve el error con el mismo id", () => {

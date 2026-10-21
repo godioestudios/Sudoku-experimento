@@ -16,6 +16,7 @@ export default function Acciones({
   onAlternarNotas,
   onPista,
   onNuevo,
+  pistasRestantes,
 }) {
   return (
     <div className="acciones">
@@ -44,9 +45,19 @@ export default function Acciones({
         <span className="accion-texto">Apuntes</span>
       </button>
 
-      <button type="button" className="accion" disabled={deshabilitado} onClick={onPista}>
+      <button
+        type="button"
+        className="accion"
+        title={
+          pistasRestantes > 0
+            ? `Pistas restantes: ${pistasRestantes}`
+            : "No quedan pistas disponibles"
+        }
+        disabled={deshabilitado || pistasRestantes <= 0}
+        onClick={onPista}
+      >
         <IconoPista />
-        <span className="accion-texto">Pista</span>
+        <span className="accion-texto">Pista ({pistasRestantes})</span>
       </button>
 
       <button

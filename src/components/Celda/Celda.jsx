@@ -1,4 +1,5 @@
 import { TAMAÑO_CAJA } from "../../utils/sudoku.js";
+import { etiquetaCelda } from "../../utils/accesibilidad.js";
 import "./Celda.css";
 
 /**
@@ -19,6 +20,7 @@ export default function Celda({
   onSeleccionar,
 }) {
   const clases = ["celda"];
+  const incorrecta = !esFija && valor !== 0 && valor !== solucion;
 
   if (columna === 2 || columna === 5) clases.push("borde-derecha");
   if (fila === 2 || fila === 5) clases.push("borde-abajo");
@@ -43,7 +45,7 @@ export default function Celda({
 
     if (valorSeleccionado !== 0 && valor === valorSeleccionado) clases.push("mismo-numero");
 
-    if (!esFija && valor !== 0 && valor !== solucion) clases.push("error");
+    if (incorrecta) clases.push("error");
   }
 
   const mostrarNotas = !pausado && valor === 0 && candidatos.size > 0;
@@ -53,6 +55,17 @@ export default function Celda({
       type="button"
       className={clases.join(" ")}
       role="gridcell"
+      aria-label={etiquetaCelda({
+        fila,
+        columna,
+        valor,
+        esFija,
+        candidatos,
+        incorrecta,
+        pausado,
+      })}
+      aria-selected={seleccionada}
+      aria-readonly={esFija}
       onClick={() => onSeleccionar(fila, columna)}
     >
       {pausado ? null : valor !== 0 ? (

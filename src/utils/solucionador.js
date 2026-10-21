@@ -42,6 +42,55 @@ export const ESTADOS = {
   INVALIDO: "invalido",
 };
 
+// Nivel lógico según la técnica más avanzada que hizo falta para avanzar.
+// DESCONOCIDO significa que el solucionador se bloqueó incluso después de
+// probar cuartetos: el puzzle exige técnicas que este motor no implementa.
+export const NIVELES_DIFICULTAD_LOGICA = {
+  FACIL: 0,
+  MEDIO: 1,
+  DIFICIL: 2,
+  EXPERTO: 3,
+  DESCONOCIDO: 4,
+};
+
+// Criterios que usa el generador. Fácil/medio/difícil son topes (no se
+// acepta un puzzle más difícil que el pedido); experto es un mínimo
+// (cuartetos o técnicas no implementadas). No hay garantía de un nivel
+// exacto: el motor no implementa técnicas expertas como X-Wing.
+export const CRITERIOS_DIFICULTAD_LOGICA = {
+  facil: { maximo: NIVELES_DIFICULTAD_LOGICA.FACIL },
+  medio: { maximo: NIVELES_DIFICULTAD_LOGICA.MEDIO },
+  dificil: { maximo: NIVELES_DIFICULTAD_LOGICA.DIFICIL },
+  experto: { minimo: NIVELES_DIFICULTAD_LOGICA.EXPERTO },
+};
+
+const NIVEL_POR_TECNICA = {
+  [TECNICAS.NAKED_SINGLE]: NIVELES_DIFICULTAD_LOGICA.FACIL,
+  [TECNICAS.HIDDEN_SINGLE]: NIVELES_DIFICULTAD_LOGICA.FACIL,
+  [TECNICAS.NAKED_PAIR]: NIVELES_DIFICULTAD_LOGICA.MEDIO,
+  [TECNICAS.HIDDEN_PAIR]: NIVELES_DIFICULTAD_LOGICA.MEDIO,
+  [TECNICAS.NAKED_TRIPLE]: NIVELES_DIFICULTAD_LOGICA.DIFICIL,
+  [TECNICAS.HIDDEN_TRIPLE]: NIVELES_DIFICULTAD_LOGICA.DIFICIL,
+  [TECNICAS.NAKED_QUAD]: NIVELES_DIFICULTAD_LOGICA.EXPERTO,
+  [TECNICAS.HIDDEN_QUAD]: NIVELES_DIFICULTAD_LOGICA.EXPERTO,
+};
+
+const NOMBRE_POR_NIVEL = {
+  [NIVELES_DIFICULTAD_LOGICA.FACIL]: "facil",
+  [NIVELES_DIFICULTAD_LOGICA.MEDIO]: "medio",
+  [NIVELES_DIFICULTAD_LOGICA.DIFICIL]: "dificil",
+  [NIVELES_DIFICULTAD_LOGICA.EXPERTO]: "experto",
+  [NIVELES_DIFICULTAD_LOGICA.DESCONOCIDO]: "desconocido",
+};
+
+const ETIQUETA_POR_NIVEL = {
+  [NIVELES_DIFICULTAD_LOGICA.FACIL]: "Fácil",
+  [NIVELES_DIFICULTAD_LOGICA.MEDIO]: "Medio",
+  [NIVELES_DIFICULTAD_LOGICA.DIFICIL]: "Difícil",
+  [NIVELES_DIFICULTAD_LOGICA.EXPERTO]: "Experto",
+  [NIVELES_DIFICULTAD_LOGICA.DESCONOCIDO]: "Avanzado (sin verificar)",
+};
+
 /**
  * Números del 1 al 9 que pueden ocupar una casilla vacía,
  * según fila, columna y caja 3x3.
@@ -790,6 +839,87 @@ export function clasificarTablero(tablero) {
   if (detectarNakedSingles(tablero).length > 0) return ESTADOS.RESOLUBLE;
   if (detectarHiddenSingles(tablero).length > 0) return ESTADOS.RESOLUBLE;
   return ESTADOS.BLOQUEADO;
+}
+
+/**
+ * Evalúa la dificultad lógica real de un puzzle con resolverLogico.
+ *
+ * El nivel es la técnica más avanzada que hizo falta para avanzar:
+ * singles (fácil), pares (medio), tríos (difícil) o cuartetos (experto).
+ * Si el solucionador se bloquea, el nivel es DESCONOCIDO ("Avanzado
+ * (sin verificar)"): el puzzle exige técnicas que este motor no
+ * implementa, así que no se puede garantizar un nivel lógico exacto.
+ *
+ * clasificarTablero no alcanza para esto: solo mira singles
+ * aplicables en el tablero inicial y no conserva eliminaciones.
+ *
+ * @param {number[][]} tablero
+ * @returns {{
+ *   estado: string,
+ *   resuelto: boolean,
+ *   nivel: number|null,
+ *   nombre: string,
+ *   etiqueta: string,
+ *   verificado: boolean,
+ *   tecnicas: string[]
+ * }}
+ */
+export function evaluarDificultadLogica(tablero) {
+  const { estado, pasos } = resolverLogico(tablero);
+  const tecnicas = [...new Set(pasos.map((paso) => paso.tecnica))];
+
+  if (estado === ESTADOS.INVALIDO) {
+    return {
+      estado,
+      resuelto: false,
+      nivel: null,
+      nombre: "invalido",
+      etiqueta: "Inválido",
+      verificado: false,
+      tecnicas,
+    };
+  }
+
+  if (estado === ESTADOS.BLOQUEADO) {
+    return {
+      estado,
+      resuelto: false,
+      nivel: NIVELES_DIFICULTAD_LOGICA.DESCONOCIDO,
+      nombre: NOMBRE_POR_NIVEL[NIVELES_DIFICULTAD_LOGICA.DESCONOCIDO],
+      etiqueta: ETIQUETA_POR_NIVEL[NIVELES_DIFICULTAD_LOGICA.DESCONOCIDO],
+      verificado: false,
+      tecnicas,
+    };
+  }
+
+  const nivel = tecnicas.reduce(
+    (maximo, tecnica) =>
+      Math.max(maximo, NIVEL_POR_TECNICA[tecnica] ?? NIVELES_DIFICULTAD_LOGICA.FACIL),
+    NIVELES_DIFICULTAD_LOGICA.FACIL
+  );
+
+  return {
+    estado,
+    resuelto: estado === ESTADOS.RESUELTO,
+    nivel,
+    nombre: NOMBRE_POR_NIVEL[nivel],
+    etiqueta: ETIQUETA_POR_NIVEL[nivel],
+    verificado: true,
+    tecnicas,
+  };
+}
+
+/**
+ * Indica si una evaluación de dificultad cumple el criterio del nivel
+ * pedido. Los niveles bajos son topes; experto exige un mínimo.
+ */
+export function cumpleDificultadLogica(evaluacion, dificultad) {
+  const criterio = CRITERIOS_DIFICULTAD_LOGICA[dificultad];
+  if (!criterio || !evaluacion || evaluacion.nivel === null) return false;
+  if (criterio.minimo !== undefined) {
+    return evaluacion.nivel >= criterio.minimo;
+  }
+  return evaluacion.nivel <= criterio.maximo;
 }
 
 /**

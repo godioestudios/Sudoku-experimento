@@ -2,10 +2,13 @@ import test from "node:test";
 import assert from "node:assert/strict";
 
 import {
+  CRITERIOS_DIFICULTAD_LOGICA,
   ESTADOS,
+  NIVELES_DIFICULTAD_LOGICA,
   TECNICAS,
   aplicarColocacion,
   clasificarTablero,
+  cumpleDificultadLogica,
   detectarHiddenPares,
   detectarHiddenQuads,
   detectarHiddenSingles,
@@ -14,6 +17,7 @@ import {
   detectarNakedQuads,
   detectarNakedSingles,
   detectarNakedTriples,
+  evaluarDificultadLogica,
   obtenerCandidatos,
   resolverLogico,
   tableroEsValido,
@@ -3569,4 +3573,68 @@ test("los tableros inválidos siguen clasificándose como inválidos con hidden 
     assert.deepEqual(tablero, original);
     assert.deepEqual(invalido, original);
   }
+});
+
+// ------------------------------------------------------------
+// Dificultad lógica
+// ------------------------------------------------------------
+
+test("evaluarDificultadLogica distingue singles, pares, tríos y cuartetos", () => {
+  assert.equal(evaluarDificultadLogica(SOLUCION).nivel, NIVELES_DIFICULTAD_LOGICA.FACIL);
+  assert.equal(evaluarDificultadLogica(SOLUCION).resuelto, true);
+
+  const singles = evaluarDificultadLogica(RESOLUBLE_SINGLES);
+  assert.equal(singles.nivel, NIVELES_DIFICULTAD_LOGICA.FACIL);
+  assert.equal(singles.resuelto, true);
+  assert.equal(singles.etiqueta, "Fácil");
+
+  const pares = evaluarDificultadLogica(PAR_HABILITA_SINGLES_SIN_SINGLES);
+  assert.equal(pares.nivel, NIVELES_DIFICULTAD_LOGICA.MEDIO);
+  assert.equal(pares.etiqueta, "Medio");
+
+  const triples = evaluarDificultadLogica(NAKED_TRIPLE_DESBLOQUEA);
+  assert.equal(triples.nivel, NIVELES_DIFICULTAD_LOGICA.DIFICIL);
+  assert.equal(triples.etiqueta, "Difícil");
+
+  const quads = evaluarDificultadLogica(NAKED_QUAD_DESBLOQUEA);
+  assert.equal(quads.nivel, NIVELES_DIFICULTAD_LOGICA.EXPERTO);
+  assert.equal(quads.etiqueta, "Experto");
+  assert.equal(quads.verificado, true);
+});
+
+test("evaluarDificultadLogica no garantiza un nivel si el solucionador se bloquea", () => {
+  const evaluacion = evaluarDificultadLogica(BLOQUEADO_CON_PASOS);
+
+  assert.equal(evaluacion.estado, ESTADOS.BLOQUEADO);
+  assert.equal(evaluacion.resuelto, false);
+  assert.equal(evaluacion.nivel, NIVELES_DIFICULTAD_LOGICA.DESCONOCIDO);
+  assert.equal(evaluacion.verificado, false);
+  assert.match(evaluacion.etiqueta, /sin verificar/);
+});
+
+test("cumpleDificultadLogica aplica topes en niveles bajos y mínimo en experto", () => {
+  const facil = evaluarDificultadLogica(RESOLUBLE_SINGLES);
+  const medio = evaluarDificultadLogica(PAR_HABILITA_SINGLES_SIN_SINGLES);
+  const experto = evaluarDificultadLogica(NAKED_QUAD_DESBLOQUEA);
+  const sinVerificar = evaluarDificultadLogica(BLOQUEADO_CON_PASOS);
+
+  assert.equal(cumpleDificultadLogica(facil, "facil"), true);
+  assert.equal(cumpleDificultadLogica(medio, "facil"), false);
+  assert.equal(cumpleDificultadLogica(medio, "medio"), true);
+  assert.equal(cumpleDificultadLogica(experto, "dificil"), false);
+  assert.equal(cumpleDificultadLogica(experto, "experto"), true);
+  assert.equal(cumpleDificultadLogica(sinVerificar, "experto"), true);
+  assert.equal(cumpleDificultadLogica(sinVerificar, "dificil"), false);
+  assert.equal(
+    Object.keys(CRITERIOS_DIFICULTAD_LOGICA).length,
+    Object.keys(NIVELES_DIFICULTAD_LOGICA).length - 1
+  );
+});
+
+test("evaluarDificultadLogica marca inválido un tablero con repetidos", () => {
+  const evaluacion = evaluarDificultadLogica(DUPLICADO_FILA);
+
+  assert.equal(evaluacion.estado, ESTADOS.INVALIDO);
+  assert.equal(evaluacion.nivel, null);
+  assert.equal(evaluacion.verificado, false);
 });

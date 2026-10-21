@@ -1,0 +1,24 @@
+.modal-acciones {
+    display: flex;
+    gap: 10px;
+}
+
+.modal-acciones>button {
+    flex: 1;
+}
+
+.boton-secundario {
+    border: 1px solid var(--borde-interactivo);
+    border-radius: 12px;
+    background: transparent;
+    color: var(--texto);
+    font-size: 15px;
+    font-weight: 700;
+    padding: 13px;
+    cursor: pointer;
+    transition: background 0.15s;
+}
+
+.boton-secundario:hover {
+    background: var(--superficie-suave);
+}

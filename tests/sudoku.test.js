@@ -3,9 +3,15 @@ import assert from "node:assert/strict";
 
 import {
   DIFICULTADES,
+  contarSoluciones,
   crearPuzzle,
+  crearPuzzleConResultado,
   generarTableroResuelto,
 } from "../src/utils/sudoku.js";
+import {
+  cumpleDificultadLogica,
+  evaluarDificultadLogica,
+} from "../src/utils/solucionador.js";
 
 // ------------------------------------------------------------
 // Comprobaciones independientes del generador
@@ -304,4 +310,70 @@ test("crearPuzzle rechaza entradas que no son matrices 9x9", () => {
   for (const entrada of invalidas) {
     assert.throws(() => crearPuzzle(entrada, 36), TypeError);
   }
+});
+
+// ------------------------------------------------------------
+// Dificultad lógica y resultado de generación
+// ------------------------------------------------------------
+
+test("crearPuzzleConResultado informa cuando cumple vacías y dificultad lógica", () => {
+  const solucion = generarTableroResuelto();
+
+  const resultado = crearPuzzleConResultado(solucion, 30, {
+    evaluar: evaluarDificultadLogica,
+    aceptar: (evaluacion) => cumpleDificultadLogica(evaluacion, "facil"),
+    maxIntentos: 1,
+  });
+
+  assert.equal(resultado.alcanzado, true);
+  assert.equal(resultado.motivo, "objetivo");
+  assert.equal(resultado.vacias, 30);
+  assert.equal(resultado.evaluacion.nivel, 0);
+  assert.equal(resultado.evaluacion.etiqueta, "Fácil");
+  assert.equal(esSudokuValido(resultado.puzzle), true);
+  assert.equal(contarSolucionesIndependiente(resultado.puzzle, 2), 1);
+});
+
+test("crearPuzzleConResultado no presenta un puzzle fácil como experto", () => {
+  const solucion = generarTableroResuelto();
+
+  // Una solución completa es un puzzle válido de dificultad lógica fácil.
+  // Pedirle nivel experto no debe aceptarse aunque el objetivo de vacías
+  // (0) se cumpla.
+  const resultado = crearPuzzleConResultado(solucion, 0, {
+    evaluar: evaluarDificultadLogica,
+    aceptar: (evaluacion) => cumpleDificultadLogica(evaluacion, "experto"),
+    maxIntentos: 1,
+  });
+
+  assert.equal(resultado.alcanzado, false);
+  assert.equal(resultado.motivo, "dificultad");
+  assert.equal(resultado.vacias, 0);
+  assert.equal(resultado.evaluacion.etiqueta, "Fácil");
+  assert.equal(contarSolucionesIndependiente(resultado.puzzle, 2), 1);
+});
+
+test("crearPuzzleConResultado informa el agotamiento del presupuesto", () => {
+  const solucion = generarTableroResuelto();
+
+  const resultado = crearPuzzleConResultado(solucion, 81, {
+    evaluar: evaluarDificultadLogica,
+    aceptar: () => false,
+    maxIntentos: 5,
+    presupuestoMs: 0,
+  });
+
+  assert.equal(resultado.alcanzado, false);
+  assert.equal(resultado.motivo, "presupuesto");
+  assert.equal(esSudokuValido(resultado.puzzle), true);
+  assert.ok(contarVacias(resultado.puzzle) < 81);
+  assert.equal(contarSolucionesIndependiente(resultado.puzzle, 2), 1);
+});
+
+test("contarSoluciones importado por el generador coincide con el contador independiente", () => {
+  const solucion = generarTableroResuelto();
+  const puzzle = crearPuzzle(solucion, DIFICULTADES.facil);
+
+  assert.equal(contarSoluciones(copiar(puzzle), 2), 1);
+  assert.equal(contarSolucionesIndependiente(puzzle, 2), 1);
 });

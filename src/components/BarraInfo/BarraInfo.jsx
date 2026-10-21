@@ -4,6 +4,7 @@ import "./BarraInfo.css";
 
 export default function BarraInfo({
   dificultad,
+  etiquetaDificultad,
   errores,
   segundos,
   pausado,
@@ -14,7 +15,9 @@ export default function BarraInfo({
     <section className="barra-info">
       <div className="info-bloque">
         <span className="info-etiqueta">Dificultad</span>
-        <span className="info-valor">{NOMBRES_DIFICULTAD[dificultad]}</span>
+        <span className="info-valor">
+          {etiquetaDificultad ?? NOMBRES_DIFICULTAD[dificultad]}
+        </span>
       </div>
 
       <div className="info-bloque info-bloque-centro">

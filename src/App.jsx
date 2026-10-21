@@ -6,6 +6,7 @@ import Tablero from "./components/Tablero/Tablero.jsx";
 import Teclado from "./components/Teclado/Teclado.jsx";
 import Acciones from "./components/Acciones/Acciones.jsx";
 import ModalVictoria from "./components/ModalVictoria/ModalVictoria.jsx";
+import ModalConfirmacion from "./components/ModalConfirmacion/ModalConfirmacion.jsx";
 import "./App.css";
 
 const App = () => {
@@ -25,6 +26,7 @@ const App = () => {
       <main className="juego">
         <BarraInfo
           dificultad={juego.dificultad}
+          etiquetaDificultad={juego.etiquetaDificultad}
           errores={juego.errores}
           segundos={juego.segundos}
           pausado={juego.pausado}
@@ -63,6 +65,7 @@ const App = () => {
           onBorrar={juego.borrarCelda}
           onAlternarNotas={juego.alternarNotas}
           onPista={juego.darPista}
+          pistasRestantes={juego.pistasRestantes}
           onNuevo={() => juego.nuevoJuego()}
         />
 
@@ -74,6 +77,12 @@ const App = () => {
         segundos={juego.segundos}
         errores={juego.errores}
         onNuevoJuego={() => juego.nuevoJuego()}
+      />
+
+      <ModalConfirmacion
+        visible={juego.confirmacionPendiente !== null}
+        onConfirmar={juego.confirmarNuevoJuego}
+        onCancelar={juego.cancelarNuevoJuego}
       />
     </>
   );
