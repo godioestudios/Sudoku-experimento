@@ -196,6 +196,50 @@ test("inicia una partida en dificultad media y aplica la generación", (t) => {
   assert.equal(resultado.current.deshacerDisponible, false);
 });
 
+test("listo se apaga durante una nueva generación y se recupera al terminar o fallar", (t) => {
+  const { workers, montar } = preparar(t);
+  const { resultado } = montar();
+  const primera = crearPartida([[0, 0]]);
+
+  assert.equal(resultado.current.generando, true);
+  assert.equal(resultado.current.listo, false);
+
+  completarGeneracion(workers.instancias[0], primera);
+  assert.equal(resultado.current.generando, false);
+  assert.equal(resultado.current.listo, true);
+
+  ejecutar(() => resultado.current.nuevoJuego("dificil"));
+  assert.equal(resultado.current.generando, true);
+  assert.equal(resultado.current.listo, false);
+  assert.deepEqual(resultado.current.tableroJuego, primera.tableroJuego);
+
+  const segunda = crearPartida([[1, 1]]);
+  completarGeneracion(workers.instancias[1], segunda);
+  assert.equal(resultado.current.generando, false);
+  assert.equal(resultado.current.listo, true);
+  assert.deepEqual(resultado.current.tableroJuego, segunda.tableroJuego);
+
+  ejecutar(() => resultado.current.nuevoJuego("facil"));
+  assert.equal(resultado.current.listo, false);
+
+  fallarGeneracion(workers.instancias[2], "boom");
+  assert.equal(resultado.current.generando, false);
+  assert.equal(resultado.current.listo, true);
+  assert.match(resultado.current.estado, /No se pudo generar el puzzle: boom/);
+  assert.deepEqual(resultado.current.tableroJuego, segunda.tableroJuego);
+});
+
+test("una generación inicial fallida no deja el indicador de carga activo", (t) => {
+  const { workers, montar } = preparar(t);
+  const { resultado } = montar();
+
+  fallarGeneracion(workers.instancias[0], "boom");
+
+  assert.equal(resultado.current.generando, false);
+  assert.equal(resultado.current.listo, false);
+  assert.match(resultado.current.estado, /No se pudo generar el puzzle: boom/);
+});
+
 test("cambiar de dificultad reinicia el progreso y descarta respuestas obsoletas", (t) => {
   const { workers, montar } = preparar(t);
   const { resultado } = montar();

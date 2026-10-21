@@ -472,7 +472,7 @@ export function useSudoku() {
     estado: victoria ? "¡Sudoku completado!" : estado,
     conteoDigitos,
     deshacerDisponible: historial.length > 0,
-    listo: partida !== null,
+    listo: partida !== null && !generando,
     // Acciones
     seleccionarCelda,
     colocarNumero,
