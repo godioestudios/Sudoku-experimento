@@ -53,15 +53,15 @@ export const NIVELES_DIFICULTAD_LOGICA = {
   DESCONOCIDO: 4,
 };
 
-// Criterios que usa el generador. Fácil/medio/difícil son topes (no se
-// acepta un puzzle más difícil que el pedido); experto es un mínimo
-// (cuartetos o técnicas no implementadas). No hay garantía de un nivel
-// exacto: el motor no implementa técnicas expertas como X-Wing.
+// Criterios que usa el generador: cada dificultad exige exactamente el
+// nivel lógico indicado, con el puzzle resuelto y la evaluación verificada.
+// No hay garantía de que exista un candidato para cada nivel: el motor no
+// implementa técnicas expertas como X-Wing.
 export const CRITERIOS_DIFICULTAD_LOGICA = {
-  facil: { maximo: NIVELES_DIFICULTAD_LOGICA.FACIL },
-  medio: { maximo: NIVELES_DIFICULTAD_LOGICA.MEDIO },
-  dificil: { maximo: NIVELES_DIFICULTAD_LOGICA.DIFICIL },
-  experto: { minimo: NIVELES_DIFICULTAD_LOGICA.EXPERTO },
+  facil: { nivel: NIVELES_DIFICULTAD_LOGICA.FACIL },
+  medio: { nivel: NIVELES_DIFICULTAD_LOGICA.MEDIO },
+  dificil: { nivel: NIVELES_DIFICULTAD_LOGICA.DIFICIL },
+  experto: { nivel: NIVELES_DIFICULTAD_LOGICA.EXPERTO },
 };
 
 const NIVEL_POR_TECNICA = {
@@ -853,6 +853,11 @@ export function clasificarTablero(tablero) {
  * clasificarTablero no alcanza para esto: solo mira singles
  * aplicables en el tablero inicial y no conserva eliminaciones.
  *
+ * El diagnóstico (`pasos`, `vaciasRestantes` y `ultimaTecnica`) no
+ * altera la aceptación. `vaciasRestantes` es null para tableros
+ * inválidos y `ultimaTecnica` es null cuando no se aplicó ninguna
+ * técnica (tablero ya resuelto o bloqueo inmediato).
+ *
  * @param {number[][]} tablero
  * @returns {{
  *   estado: string,
@@ -861,12 +866,16 @@ export function clasificarTablero(tablero) {
  *   nombre: string,
  *   etiqueta: string,
  *   verificado: boolean,
- *   tecnicas: string[]
+ *   tecnicas: string[],
+ *   pasos: number,
+ *   vaciasRestantes: number|null,
+ *   ultimaTecnica: string|null
  * }}
  */
 export function evaluarDificultadLogica(tablero) {
-  const { estado, pasos } = resolverLogico(tablero);
+  const { estado, pasos, tablero: tableroFinal } = resolverLogico(tablero);
   const tecnicas = [...new Set(pasos.map((paso) => paso.tecnica))];
+  const ultimaTecnica = pasos.at(-1)?.tecnica ?? null;
 
   if (estado === ESTADOS.INVALIDO) {
     return {
@@ -877,8 +886,13 @@ export function evaluarDificultadLogica(tablero) {
       etiqueta: "Inválido",
       verificado: false,
       tecnicas,
+      pasos: pasos.length,
+      vaciasRestantes: null,
+      ultimaTecnica,
     };
   }
+
+  const vaciasRestantes = tableroFinal.flat().filter((valor) => valor === 0).length;
 
   if (estado === ESTADOS.BLOQUEADO) {
     return {
@@ -889,6 +903,9 @@ export function evaluarDificultadLogica(tablero) {
       etiqueta: ETIQUETA_POR_NIVEL[NIVELES_DIFICULTAD_LOGICA.DESCONOCIDO],
       verificado: false,
       tecnicas,
+      pasos: pasos.length,
+      vaciasRestantes,
+      ultimaTecnica,
     };
   }
 
@@ -897,29 +914,31 @@ export function evaluarDificultadLogica(tablero) {
       Math.max(maximo, NIVEL_POR_TECNICA[tecnica] ?? NIVELES_DIFICULTAD_LOGICA.FACIL),
     NIVELES_DIFICULTAD_LOGICA.FACIL
   );
+  const resuelto = estado === ESTADOS.RESUELTO;
 
   return {
     estado,
-    resuelto: estado === ESTADOS.RESUELTO,
+    resuelto,
     nivel,
     nombre: NOMBRE_POR_NIVEL[nivel],
     etiqueta: ETIQUETA_POR_NIVEL[nivel],
-    verificado: true,
+    verificado: resuelto,
     tecnicas,
+    pasos: pasos.length,
+    vaciasRestantes,
+    ultimaTecnica,
   };
 }
 
 /**
  * Indica si una evaluación de dificultad cumple el criterio del nivel
- * pedido. Los niveles bajos son topes; experto exige un mínimo.
+ * pedido: nivel exacto, puzzle resuelto y evaluación verificada.
  */
 export function cumpleDificultadLogica(evaluacion, dificultad) {
   const criterio = CRITERIOS_DIFICULTAD_LOGICA[dificultad];
-  if (!criterio || !evaluacion || evaluacion.nivel === null) return false;
-  if (criterio.minimo !== undefined) {
-    return evaluacion.nivel >= criterio.minimo;
-  }
-  return evaluacion.nivel <= criterio.maximo;
+  if (!criterio || !evaluacion) return false;
+  if (!evaluacion.resuelto || !evaluacion.verificado) return false;
+  return evaluacion.nivel === criterio.nivel;
 }
 
 /**

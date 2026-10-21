@@ -43,7 +43,15 @@ test("procesarSolicitud responde con el id y una partida válida", () => {
   assert.equal(partida.dificultadLogica.solicitada, "facil");
   assert.equal(partida.dificultadLogica.alcanzada, true);
   assert.equal(partida.dificultadLogica.motivo, "objetivo");
+  assert.equal(partida.dificultadLogica.estado, "resuelto");
   assert.equal(partida.dificultadLogica.etiqueta, "Fácil");
+  assert.equal(partida.dificultadLogica.vaciasRestantes, 0);
+  assert.ok(partida.dificultadLogica.pasos > 0);
+  assert.ok(
+    partida.dificultadLogica.tecnicas.includes(
+      partida.dificultadLogica.ultimaTecnica
+    )
+  );
 });
 
 test("procesarSolicitud devuelve el error con el mismo id", () => {

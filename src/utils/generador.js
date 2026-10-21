@@ -1,6 +1,5 @@
 import {
   DIFICULTADES,
-  NOMBRES_DIFICULTAD,
   copiarTablero,
   crearNotasVacias,
   crearPuzzleConResultado,
@@ -27,12 +26,9 @@ export function generarPartida(nivel) {
   const evaluacion =
     resultado.evaluacion ?? evaluarDificultadLogica(resultado.puzzle);
 
-  // Solo se garantiza el nivel pedido si la etiqueta del motor coincide.
-  // Un puzzle "Avanzado (sin verificar)" no es un Experto garantizado.
-  const alcanzada =
-    resultado.alcanzado && evaluacion.etiqueta === NOMBRES_DIFICULTAD[nivel];
-  const motivo =
-    resultado.alcanzado && !alcanzada ? "dificultad" : resultado.motivo;
+  // resultado.alcanzado ya exige el objetivo de vacías y cumpleDificultadLogica.
+  // La etiqueta es solo informativa: no decide la aceptación.
+  const alcanzada = resultado.alcanzado;
 
   return {
     tableroSolucion,
@@ -42,14 +38,18 @@ export function generarPartida(nivel) {
     dificultadLogica: {
       solicitada: nivel,
       alcanzada,
-      motivo,
+      motivo: resultado.motivo,
+      estado: evaluacion.estado,
       nivel: evaluacion.nivel,
       nombre: evaluacion.nombre,
       etiqueta: evaluacion.etiqueta,
       verificado: evaluacion.verificado,
       tecnicas: evaluacion.tecnicas,
+      pasos: evaluacion.pasos,
       vacias: resultado.vacias,
       vaciasObjetivo: objetivoVacias,
+      vaciasRestantes: evaluacion.vaciasRestantes,
+      ultimaTecnica: evaluacion.ultimaTecnica,
     },
   };
 }
