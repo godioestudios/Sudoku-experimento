@@ -3,10 +3,12 @@ import assert from "node:assert/strict";
 
 import {
   DIFICULTADES,
+  crearAleatorioSembrado,
   contarSoluciones,
   crearPuzzle,
   crearPuzzleConResultado,
   generarTableroResuelto,
+  resolverSudoku,
 } from "../src/utils/sudoku.js";
 import {
   cumpleDificultadLogica,
@@ -215,6 +217,34 @@ test("generarTableroResuelto devuelve una solución 9x9 completa y válida", () 
   }
 });
 
+test("el aleatorio sembrado es estable, cambia con otra semilla y queda en [0, 1)", () => {
+  const secuencia = (semilla) => {
+    const aleatorio = crearAleatorioSembrado(semilla);
+    return Array.from({ length: 12 }, () => aleatorio());
+  };
+  const aleatorioA = crearAleatorioSembrado("sudoku-prueba");
+  const aleatorioB = crearAleatorioSembrado("sudoku-prueba");
+  const valoresA = Array.from({ length: 32 }, () => aleatorioA());
+  const valoresB = Array.from({ length: 32 }, () => aleatorioB());
+
+  assert.deepEqual(valoresA, valoresB);
+  assert.notDeepEqual(secuencia("sudoku-prueba"), secuencia("otra-semilla"));
+  for (const valor of valoresA) {
+    assert.ok(valor >= 0);
+    assert.ok(valor < 1);
+  }
+});
+
+test("la semilla controla también el tablero resuelto", () => {
+  const primero = generarTableroResuelto(crearAleatorioSembrado(12345));
+  const repetido = generarTableroResuelto(crearAleatorioSembrado(12345));
+  const distinto = generarTableroResuelto(crearAleatorioSembrado(54321));
+
+  assert.deepEqual(primero, repetido);
+  assert.notDeepEqual(primero, distinto);
+  assert.equal(esSudokuValido(primero, { completa: true }), true);
+});
+
 // ------------------------------------------------------------
 // Puzzles generados por nivel
 // ------------------------------------------------------------
@@ -392,6 +422,24 @@ test("crearPuzzleConResultado no presenta un puzzle fácil como experto", () => 
   assert.equal(contarSolucionesIndependiente(resultado.puzzle, 2), 1);
 });
 
+test("una aceptación externa no puede validar una evaluación bloqueada", () => {
+  const resultado = crearPuzzleConResultado(SOLUCION_FIJA, 0, {
+    evaluar: () =>
+      evaluacionLogica(4, {
+        estado: "bloqueado",
+        resuelto: false,
+        verificado: false,
+      }),
+    aceptar: () => true,
+    maxIntentos: 1,
+    maxIntercambiosPorSemilla: 0,
+  });
+
+  assert.equal(resultado.alcanzado, false);
+  assert.equal(resultado.motivo, "dificultad");
+  assert.equal(resultado.evaluacion.estado, "bloqueado");
+});
+
 test("crearPuzzleConResultado informa el agotamiento del presupuesto", () => {
   const solucion = generarTableroResuelto();
 
@@ -541,6 +589,61 @@ test("la búsqueda respeta el máximo de evaluaciones", () => {
   assert.equal(resultado.alcanzado, false);
 });
 
+test("consumir exactamente el máximo de evaluaciones no agota el presupuesto", () => {
+  let llamadas = 0;
+  const diagnostico = {};
+
+  const resultado = crearPuzzleConResultado(SOLUCION_FIJA, 30, {
+    evaluar: () => {
+      llamadas++;
+      return evaluacionLogica(0);
+    },
+    aceptar: () => false,
+    aleatorio: crearAleatorio(7),
+    maxEvaluaciones: 1,
+    maxIntentos: 1,
+    maxIntercambiosPorSemilla: 0,
+    presupuestoMs: 1000,
+    ahora: () => 0,
+    diagnostico,
+  });
+
+  assert.equal(llamadas, 1);
+  assert.equal(resultado.vacias, 30);
+  assert.equal(resultado.presupuestoAgotado, false);
+  assert.equal(resultado.busquedaCompleta, true);
+  assert.equal(resultado.motivo, "dificultad");
+  assert.equal(resultado.motivoAgotamiento, null);
+  assert.equal(diagnostico.motivoAgotamiento, null);
+});
+
+test("el máximo de evaluaciones agota el presupuesto solo si queda otra evaluación", () => {
+  let llamadas = 0;
+  const diagnostico = {};
+
+  const resultado = crearPuzzleConResultado(SOLUCION_FIJA, 30, {
+    evaluar: () => {
+      llamadas++;
+      return evaluacionLogica(0);
+    },
+    aceptar: () => false,
+    aleatorio: crearAleatorio(7),
+    maxEvaluaciones: 1,
+    maxIntentos: 1,
+    maxIntercambiosPorSemilla: 1,
+    presupuestoMs: 1000,
+    ahora: () => 0,
+    diagnostico,
+  });
+
+  assert.equal(llamadas, 1);
+  assert.equal(resultado.presupuestoAgotado, true);
+  assert.equal(resultado.busquedaCompleta, false);
+  assert.equal(resultado.motivo, "presupuesto");
+  assert.equal(resultado.motivoAgotamiento, "evaluaciones");
+  assert.equal(diagnostico.motivoAgotamiento, "evaluaciones");
+});
+
 test("un vecino no único se descarta antes de evaluar la dificultad", () => {
   const diagnostico = {};
   let evaluaciones = 0;
@@ -583,6 +686,75 @@ test("contarSoluciones conserva el conteo numérico completo", () => {
   sinSolucion[1][7] = 9;
   sinSolucion[3][8] = 9;
   assert.equal(contarSoluciones(copiar(sinSolucion), 2), 0);
+});
+
+test("una semilla controla vaciado, intercambios y diagnóstico determinista", () => {
+  const crearOpciones = () => {
+    const diagnostico = {};
+    return {
+      semilla: "intercambios-controlados",
+      evaluar: () => evaluacionLogica(0),
+      aceptar: () => false,
+      puntuar: () => 1,
+      maxIntentos: 1,
+      maxIntercambiosPorSemilla: 3,
+      maxEvaluaciones: 4,
+      presupuestoMs: 1000,
+      ahora: () => 0,
+      diagnostico,
+    };
+  };
+
+  const opcionesA = crearOpciones();
+  const opcionesB = crearOpciones();
+  const primero = crearPuzzleConResultado(SOLUCION_FIJA, 30, opcionesA);
+  const repetido = crearPuzzleConResultado(SOLUCION_FIJA, 30, opcionesB);
+
+  assert.deepEqual(primero.puzzle, repetido.puzzle);
+  assert.deepEqual(opcionesA.diagnostico, opcionesB.diagnostico);
+  assert.ok(opcionesA.diagnostico.intercambios > 0);
+  assert.equal(primero.evaluacion.nivel, repetido.evaluacion.nivel);
+  assert.equal(primero.motivo, repetido.motivo);
+  assert.equal(contarSoluciones(copiar(primero.puzzle), 2), 1);
+});
+
+test("el contador y el backtracking rechazan un tablero completo inválido", () => {
+  const invalido = copiar(SOLUCION_FIJA);
+  invalido[0][1] = invalido[0][0];
+  const original = copiar(invalido);
+
+  assert.equal(contarSoluciones(invalido, 2), 0);
+  assert.equal(resolverSudoku(invalido), false);
+  assert.deepEqual(invalido, original);
+});
+
+test("contarSoluciones rechaza límites e estructuras inválidas sin mutarlas", () => {
+  const invalido = [[1]];
+  assert.equal(contarSoluciones(invalido, 2), 0);
+  assert.equal(contarSoluciones(copiar(SOLUCION_FIJA), 0), 0);
+  assert.equal(contarSoluciones(copiar(SOLUCION_FIJA), 1.5), 0);
+  assert.deepEqual(invalido, [[1]]);
+});
+
+test("opciones numéricas inválidas conservan límites seguros y devuelven diagnóstico", () => {
+  const diagnostico = {};
+  const resultado = crearPuzzleConResultado(SOLUCION_FIJA, 0, {
+    evaluar: () => evaluacionLogica(0),
+    aceptar: () => false,
+    maxIntentos: Number.NaN,
+    maxEvaluaciones: 1,
+    maxIntercambiosPorSemilla: Number.NaN,
+    presupuestoMs: Number.NaN,
+    ahora: () => 0,
+    diagnostico,
+  });
+
+  assert.equal(resultado.alcanzado, false);
+  assert.equal(resultado.motivo, "presupuesto");
+  assert.equal(resultado.motivoAgotamiento, "evaluaciones");
+  assert.equal(diagnostico.semillas, 1);
+  assert.equal(diagnostico.evaluaciones, 1);
+  assert.equal(contarSoluciones(copiar(resultado.puzzle), 2), 1);
 });
 
 test("el límite de nodos interrumpe sin aceptar ni confundir el conteo", () => {
@@ -673,4 +845,73 @@ test("el presupuesto de tiempo se comprueba antes de iniciar el conteo", () => {
   assert.equal(diagnostico.evaluaciones, 0);
   assert.equal(esSudokuValido(resultado.puzzle), true);
   assert.equal(contarSolucionesIndependiente(resultado.puzzle, 2), 1);
+});
+
+// ------------------------------------------------------------
+// Prioridad del motivo de terminación
+// ------------------------------------------------------------
+
+test("una interrupción por tiempo prevalece sobre las vacías objetivo", () => {
+  let ahoraMs = 0;
+
+  const resultado = crearPuzzleConResultado(SOLUCION_FIJA, 30, {
+    evaluar: () => {
+      ahoraMs = 10_000;
+      return evaluacionLogica(0);
+    },
+    aceptar: () => false,
+    aleatorio: crearAleatorio(8),
+    maxIntentos: 1,
+    presupuestoMs: 1000,
+    ahora: () => ahoraMs,
+  });
+
+  assert.equal(resultado.vacias, 30);
+  assert.equal(resultado.alcanzado, false);
+  assert.equal(resultado.motivo, "presupuesto");
+  assert.equal(resultado.presupuestoAgotado, true);
+  assert.equal(resultado.busquedaCompleta, false);
+  assert.equal(resultado.motivoAgotamiento, "tiempo");
+});
+
+test("un acierto exacto con vacías objetivo se acepta antes de agotar el presupuesto", () => {
+  const resultado = crearPuzzleConResultado(SOLUCION_FIJA, 30, {
+    evaluar: () => evaluacionLogica(1),
+    aceptar: (evaluacion) => evaluacion.nivel === 1,
+    aleatorio: crearAleatorio(9),
+    maxEvaluaciones: 10,
+    maxIntentos: 1,
+    presupuestoMs: 1000,
+    ahora: () => 0,
+  });
+
+  assert.equal(resultado.vacias, 30);
+  assert.equal(resultado.alcanzado, true);
+  assert.equal(resultado.motivo, "objetivo");
+  assert.equal(resultado.presupuestoAgotado, false);
+  assert.equal(resultado.busquedaCompleta, true);
+  assert.equal(resultado.motivoAgotamiento, null);
+});
+
+test("el límite de intentos no se confunde con un presupuesto agotado", () => {
+  const diagnostico = {};
+
+  const resultado = crearPuzzleConResultado(SOLUCION_FIJA, 81, {
+    evaluar: () => evaluacionLogica(0),
+    aceptar: () => false,
+    aleatorio: crearAleatorio(10),
+    maxIntentos: 2,
+    maxIntercambiosPorSemilla: 0,
+    presupuestoMs: 60000,
+    ahora: () => 0,
+    diagnostico,
+  });
+
+  assert.equal(resultado.alcanzado, false);
+  assert.equal(resultado.motivo, "intentos");
+  assert.equal(resultado.presupuestoAgotado, false);
+  assert.equal(resultado.busquedaCompleta, true);
+  assert.equal(resultado.motivoAgotamiento, null);
+  assert.equal(diagnostico.semillas, 2);
+  assert.equal(diagnostico.evaluaciones, 2);
 });

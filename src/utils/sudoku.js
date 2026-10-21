@@ -76,9 +76,67 @@ export function buscarCasillaVacia(tablero) {
 }
 
 /**
+ * Comprueba la forma y las reglas de un tablero parcial. Se mantiene en este
+ * módulo porque el resolvedor por backtracking y el contador son APIs
+ * públicas: un tablero completo con pistas repetidas no es una solución.
+ */
+function tableroParcialEsValido(tablero) {
+  if (!Array.isArray(tablero) || tablero.length !== TAMAÑO) return false;
+
+  for (const fila of tablero) {
+    if (!Array.isArray(fila) || fila.length !== TAMAÑO) return false;
+    for (const valor of fila) {
+      if (!Number.isInteger(valor) || valor < 0 || valor > TAMAÑO) return false;
+    }
+  }
+
+  const sinRepetidos = (valores) => {
+    const vistos = new Set();
+    for (const valor of valores) {
+      if (valor === 0) continue;
+      if (vistos.has(valor)) return false;
+      vistos.add(valor);
+    }
+    return true;
+  };
+
+  for (let indice = 0; indice < TAMAÑO; indice++) {
+    if (!sinRepetidos(tablero[indice])) return false;
+    if (!sinRepetidos(tablero.map((fila) => fila[indice]))) return false;
+  }
+
+  for (let inicioFila = 0; inicioFila < TAMAÑO; inicioFila += TAMAÑO_CAJA) {
+    for (
+      let inicioColumna = 0;
+      inicioColumna < TAMAÑO;
+      inicioColumna += TAMAÑO_CAJA
+    ) {
+      const caja = [];
+      for (let fila = inicioFila; fila < inicioFila + TAMAÑO_CAJA; fila++) {
+        for (
+          let columna = inicioColumna;
+          columna < inicioColumna + TAMAÑO_CAJA;
+          columna++
+        ) {
+          caja.push(tablero[fila][columna]);
+        }
+      }
+      if (!sinRepetidos(caja)) return false;
+    }
+  }
+
+  return true;
+}
+
+/**
  * Resuelve el Sudoku con backtracking (recursión + vuelta atrás).
  */
 export function resolverSudoku(tablero) {
+  if (!tableroParcialEsValido(tablero)) return false;
+  return resolverSudokuValido(tablero);
+}
+
+function resolverSudokuValido(tablero) {
   const casilla = buscarCasillaVacia(tablero);
   if (casilla === null) return true; // Sin huecos: resuelto
 
@@ -88,7 +146,7 @@ export function resolverSudoku(tablero) {
     if (esValido(tablero, fila, columna, numero)) {
       tablero[fila][columna] = numero;
 
-      if (resolverSudoku(tablero)) return true; // Seguir por este camino
+      if (resolverSudokuValido(tablero)) return true; // Seguir por este camino
 
       tablero[fila][columna] = 0; // Backtrack: deshacer y probar otro
     }
@@ -202,6 +260,9 @@ function contarSolucionesConPresupuesto(
  * Sirve para verificar que un puzzle tiene solución única.
  */
 export function contarSoluciones(tablero, limite = 2) {
+  if (!Number.isInteger(limite) || limite < 1 || !tableroParcialEsValido(tablero)) {
+    return 0;
+  }
   return contarSolucionesConPresupuesto(tablero, limite, null).total;
 }
 
@@ -229,6 +290,42 @@ export function copiarTablero(tablero) {
   return tablero.map((fila) => [...fila]);
 }
 
+/**
+ * Crea una fuente pseudoaleatoria reproducible de valores en [0, 1).
+ *
+ * Las cadenas se reducen con FNV-1a de 32 bits (sobre unidades UTF-16) y
+ * los números finitos se truncan a un entero sin signo de 32 bits. El estado
+ * se avanza con mulberry32. Es una fuente pequeña y estable para generación
+ * reproducible, no un generador criptográficamente seguro.
+ *
+ * @param {number|string} semilla
+ * @returns {() => number}
+ */
+export function crearAleatorioSembrado(semilla) {
+  let estado;
+
+  if (typeof semilla === "number" && Number.isFinite(semilla)) {
+    estado = Math.trunc(semilla) >>> 0;
+  } else if (typeof semilla === "string") {
+    estado = 2166136261;
+    for (let indice = 0; indice < semilla.length; indice++) {
+      estado ^= semilla.charCodeAt(indice);
+      estado = Math.imul(estado, 16777619);
+    }
+    estado >>>= 0;
+  } else {
+    throw new TypeError("La semilla debe ser un número finito o una cadena");
+  }
+
+  return () => {
+    estado = (estado + 0x6d2b79f5) >>> 0;
+    let mezcla = estado;
+    mezcla = Math.imul(mezcla ^ (mezcla >>> 15), mezcla | 1);
+    mezcla ^= mezcla + Math.imul(mezcla ^ (mezcla >>> 7), mezcla | 61);
+    return ((mezcla ^ (mezcla >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
 /** Mezcla aleatoria de un array (algoritmo Fisher-Yates). */
 export function mezclar(array, aleatorio = Math.random) {
   for (let i = array.length - 1; i > 0; i--) {
@@ -242,26 +339,26 @@ export function mezclar(array, aleatorio = Math.random) {
  * Rellena un tablero vacío por completo usando backtracking,
  * probando los números en orden aleatorio.
  */
-export function rellenarTablero(tablero) {
+export function rellenarTablero(tablero, aleatorio = Math.random) {
   const casilla = buscarCasillaVacia(tablero);
   if (casilla === null) return true;
 
   const [fila, columna] = casilla;
 
-  for (const numero of mezclar([...VALORES])) {
+  for (const numero of mezclar([...VALORES], aleatorio)) {
     if (esValido(tablero, fila, columna, numero)) {
       tablero[fila][columna] = numero;
-      if (rellenarTablero(tablero)) return true;
+      if (rellenarTablero(tablero, aleatorio)) return true;
       tablero[fila][columna] = 0; // Backtrack
     }
   }
   return false;
 }
 
-/** Crea un tablero 9x9 válido y completo. */
-export function generarTableroResuelto() {
+/** Crea un tablero 9x9 válido y completo con la fuente aleatoria indicada. */
+export function generarTableroResuelto(aleatorio = Math.random) {
   const tablero = Array.from({ length: TAMAÑO }, () => Array(TAMAÑO).fill(0));
-  rellenarTablero(tablero);
+  rellenarTablero(tablero, aleatorio);
   return tablero;
 }
 
@@ -433,6 +530,17 @@ function esSolucionCompleta(tablero) {
   return true;
 }
 
+/** Normaliza límites configurables para evitar bucles sin cota y retornos sin semilla. */
+function enteroNoNegativo(valor, predeterminado) {
+  return Number.isSafeInteger(valor) && valor >= 0 ? valor : predeterminado;
+}
+
+function numeroNoNegativo(valor, predeterminado) {
+  return typeof valor === "number" && !Number.isNaN(valor) && valor >= 0
+    ? valor
+    : predeterminado;
+}
+
 /**
  * Vacía casillas del tablero resuelto para crear el puzzle,
  * cuidando que siga teniendo UNA ÚNICA solución.
@@ -464,6 +572,11 @@ function esSolucionCompleta(tablero) {
  * presupuesto se agota, la búsqueda se interrumpe y se devuelve el
  * último candidato cuya unicidad quedó demostrada.
  *
+ * `busquedaCompleta` solo indica que el presupuesto compartido no fue
+ * marcado como agotado (tiempo, nodos o evaluaciones) en ningún punto
+ * de control. No significa que la búsqueda haya sido exhaustiva ni que
+ * se hayan explorado todos los candidatos posibles.
+ *
  * Nota: "vacías" mide casillas vacías, no dificultad lógica real;
  * un puzzle con 56 vacías puede ser más fácil de resolver que otro
  * con menos si sus técnicas de deducción son más directas.
@@ -480,6 +593,7 @@ function esSolucionCompleta(tablero) {
  *   aceptar?: (evaluacion: object) => boolean,
  *   puntuar?: (evaluacion: object) => number,
  *   aleatorio?: () => number,
+ *   semilla?: number|string,
  *   ahora?: () => number,
  *   diagnostico?: {
  *     semillas?: number,
@@ -526,13 +640,16 @@ export function crearPuzzleConResultado(tableroResuelto, objetivoVacias, opcione
     );
   }
 
-  const maxIntentos = Math.max(1, opciones.maxIntentos ?? 5);
-  const presupuestoMs = opciones.presupuestoMs ?? 3000;
-  const maxNodosUnicidad = opciones.maxNodosUnicidad ?? Infinity;
-  const maxEvaluaciones = Math.max(0, opciones.maxEvaluaciones ?? 500);
-  const maxIntercambiosPorSemilla = Math.max(
-    0,
-    opciones.maxIntercambiosPorSemilla ?? 400
+  const maxIntentos = Math.max(1, enteroNoNegativo(opciones.maxIntentos, 5));
+  const presupuestoMs = numeroNoNegativo(opciones.presupuestoMs, 3000);
+  const maxNodosUnicidad = numeroNoNegativo(
+    opciones.maxNodosUnicidad,
+    Infinity
+  );
+  const maxEvaluaciones = enteroNoNegativo(opciones.maxEvaluaciones, 500);
+  const maxIntercambiosPorSemilla = enteroNoNegativo(
+    opciones.maxIntercambiosPorSemilla,
+    400
   );
   const evaluar =
     typeof opciones.evaluar === "function" ? opciones.evaluar : null;
@@ -541,7 +658,11 @@ export function crearPuzzleConResultado(tableroResuelto, objetivoVacias, opcione
   const puntuar =
     typeof opciones.puntuar === "function" ? opciones.puntuar : null;
   const aleatorio =
-    typeof opciones.aleatorio === "function" ? opciones.aleatorio : Math.random;
+    typeof opciones.aleatorio === "function"
+      ? opciones.aleatorio
+      : opciones.semilla !== undefined
+        ? crearAleatorioSembrado(opciones.semilla)
+        : Math.random;
   const ahora =
     typeof opciones.ahora === "function" ? opciones.ahora : () => performance.now();
   const diagnostico = opciones.diagnostico ?? null;
@@ -581,12 +702,11 @@ export function crearPuzzleConResultado(tableroResuelto, objetivoVacias, opcione
   const visitados = new Set();
 
   const tiempoAgotado = () => presupuestoExcedido(presupuesto);
+  const evaluacionesConsumidas = () => evaluaciones >= maxEvaluaciones;
   const evaluacionesAgotadas = () => {
-    if (evaluaciones >= maxEvaluaciones) {
-      agotarPresupuesto(presupuesto, "evaluaciones");
-      return true;
-    }
-    return false;
+    if (!evaluacionesConsumidas()) return false;
+    agotarPresupuesto(presupuesto, "evaluaciones");
+    return true;
   };
 
   const crearCandidato = (puzzle, vacias) => {
@@ -604,8 +724,11 @@ export function crearPuzzleConResultado(tableroResuelto, objetivoVacias, opcione
       contar("evaluaciones");
     }
 
+    // `aceptar` define el nivel exacto, pero no puede convertir una
+    // evaluación bloqueada, inválida o incompleta en un éxito.
     const cumpleLogica =
-      !evaluar || (evaluacion !== null && aceptar(evaluacion));
+      !evaluar ||
+      (esEvaluacionVerificada(evaluacion) && aceptar(evaluacion));
 
     return {
       puzzle,
@@ -735,17 +858,17 @@ export function crearPuzzleConResultado(tableroResuelto, objetivoVacias, opcione
     if (presupuestoAgotado) break;
   }
 
-  if (!presupuestoAgotado && (tiempoAgotado() || evaluacionesAgotadas())) {
+  if (!presupuestoAgotado && tiempoAgotado()) {
     presupuestoAgotado = true;
   }
 
   sincronizarDiagnostico();
 
   const cumpleVacias = mejor.vacias >= objetivoVacias;
-  const motivo = cumpleVacias
-    ? "dificultad"
-    : presupuestoAgotado
-      ? "presupuesto"
+  const motivo = presupuestoAgotado
+    ? "presupuesto"
+    : cumpleVacias
+      ? "dificultad"
       : "intentos";
 
   return {

@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 
 import { copiarTablero, contarSoluciones } from "../src/utils/sudoku.js";
-import { procesarSolicitud } from "../src/utils/generador.js";
+import { generarPartida, procesarSolicitud } from "../src/utils/generador.js";
 
 const TAM = 9;
 
@@ -60,4 +60,29 @@ test("procesarSolicitud devuelve el error con el mismo id", () => {
   assert.equal(respuesta.id, 7);
   assert.match(respuesta.error, /Dificultad desconocida/);
   assert.equal(respuesta.partida, undefined);
+});
+
+test("generarPartida comparte una semilla entre solución, vaciado e intercambios", () => {
+  const primera = generarPartida("facil", { semilla: "partida-repetible" });
+  const repetida = generarPartida("facil", { semilla: "partida-repetible" });
+
+  assert.deepEqual(primera.tableroSolucion, repetida.tableroSolucion);
+  assert.deepEqual(primera.tableroJuego, repetida.tableroJuego);
+  assert.deepEqual(primera.celdasFijas, repetida.celdasFijas);
+  assert.deepEqual(
+    {
+      ...primera.dificultadLogica.diagnostico,
+      tiempoUnicidadMs: undefined,
+      tiempoEvaluacionMs: undefined,
+      tiempoTotalMs: undefined,
+    },
+    {
+      ...repetida.dificultadLogica.diagnostico,
+      tiempoUnicidadMs: undefined,
+      tiempoEvaluacionMs: undefined,
+      tiempoTotalMs: undefined,
+    }
+  );
+  assert.equal(contarSoluciones(copiarTablero(primera.tableroJuego), 2), 1);
+  assert.equal(primera.dificultadLogica.alcanzada, true);
 });

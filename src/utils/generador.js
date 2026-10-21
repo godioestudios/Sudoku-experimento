@@ -2,6 +2,7 @@ import {
   DIFICULTADES,
   copiarTablero,
   crearNotasVacias,
+  crearAleatorioSembrado,
   crearPuzzleConResultado,
   generarTableroResuelto,
 } from "./sudoku.js";
@@ -11,15 +12,21 @@ import {
   evaluarDificultadLogica,
 } from "./solucionador.js";
 
-/** Genera una partida completa; pensado para correr dentro del worker. */
-export function generarPartida(nivel) {
+/**
+ * Genera una partida completa; pensado para correr dentro del worker.
+ * `semilla` es opcional: cuando se provee, una misma versión y opciones
+ * producen las mismas decisiones de generación (no los tiempos medidos).
+ */
+export function generarPartida(nivel, { semilla } = {}) {
   const objetivoVacias = DIFICULTADES[nivel];
   if (objetivoVacias === undefined) {
     throw new Error(`Dificultad desconocida: ${nivel}`);
   }
 
   const nivelObjetivo = CRITERIOS_DIFICULTAD_LOGICA[nivel].nivel;
-  const tableroSolucion = generarTableroResuelto();
+  const aleatorio =
+    semilla === undefined ? Math.random : crearAleatorioSembrado(semilla);
+  const tableroSolucion = generarTableroResuelto(aleatorio);
   const diagnostico = {};
   const resultado = crearPuzzleConResultado(tableroSolucion, objetivoVacias, {
     evaluar: evaluarDificultadLogica,
@@ -30,6 +37,7 @@ export function generarPartida(nivel) {
       }
       return Math.abs(evaluacion.nivel - nivelObjetivo);
     },
+    aleatorio,
     diagnostico,
   });
   const puzzle = resultado.puzzle;
@@ -83,9 +91,9 @@ export function generarPartida(nivel) {
 }
 
 /** Contrato de mensajes del worker: responde siempre con el mismo id. */
-export function procesarSolicitud({ id, nivel } = {}) {
+export function procesarSolicitud({ id, nivel, semilla } = {}) {
   try {
-    return { id, partida: generarPartida(nivel) };
+    return { id, partida: generarPartida(nivel, { semilla }) };
   } catch (error) {
     return { id, error: error.message };
   }
