@@ -793,6 +793,28 @@ export function clasificarTablero(tablero) {
 }
 
 /**
+ * Escribe una colocación en el tablero solo si la casilla está vacía y
+ * el número respeta fila, columna y caja. Lanza un Error de desarrollo
+ * sin modificar el tablero si la colocación es inválida, para que una
+ * regresión en una técnica no corrompa el resultado.
+ *
+ * No demuestra que la deducción sea lógicamente correcta: solo que la
+ * colocación cumple las reglas del Sudoku.
+ */
+export function aplicarColocacion(tablero, paso) {
+  const { fila, columna, numero } = paso;
+  if (
+    tablero[fila][columna] !== 0 ||
+    !esValido(tablero, fila, columna, numero)
+  ) {
+    throw new Error(
+      `resolverLogico: colocación inválida en (${fila},${columna}) = ${numero}`
+    );
+  }
+  tablero[fila][columna] = numero;
+}
+
+/**
  * Aplica técnicas hasta que no quede ninguna disponible. Prioridad:
  * naked singles, hidden singles y, si no hay singles, naked pairs,
  * luego hidden pairs, luego naked triples, luego hidden triples, luego
@@ -819,6 +841,12 @@ export function clasificarTablero(tablero) {
  * Si la entrada no se puede copiar, el campo `tablero` del resultado
  * es la propia entrada, sin transformarla.
  *
+ * Antes de cada colocación comprueba que la casilla esté vacía y que
+ * el número respete fila, columna y caja. Si una técnica produce una
+ * colocación inválida (regresión interna), lanza un Error de
+ * desarrollo sin modificar el tablero recibido. Esa validación de
+ * reglas no demuestra que la técnica sea lógicamente correcta.
+ *
  * @param {number[][]} tablero
  * @returns {{estado: string, pasos: object[], tablero: number[][]}}
  *   estado: "resuelto" | "bloqueado" | "invalido"; pasos: técnica
@@ -826,6 +854,8 @@ export function clasificarTablero(tablero) {
  *   número; los pares y tríos registran candidatos eliminados).
  *   tablero: copia del tablero; si la entrada no se puede copiar, la
  *   entrada original tal cual.
+ * @throws {Error} Si una técnica intenta una colocación que rompe las
+ *   reglas del Sudoku.
  */
 export function resolverLogico(tablero) {
   if (!tableroEsValido(tablero)) {
@@ -848,14 +878,14 @@ export function resolverLogico(tablero) {
 
     if (naked.length > 0) {
       const paso = naked[0];
-      copia[paso.fila][paso.columna] = paso.numero;
+      aplicarColocacion(copia, paso);
       pasos.push(paso);
     } else {
       const hidden = detectarHiddenSingles(copia, eliminados);
 
       if (hidden.length > 0) {
         const paso = hidden[0];
-        copia[paso.fila][paso.columna] = paso.numero;
+        aplicarColocacion(copia, paso);
         pasos.push(paso);
       } else {
         // Sin singles: aplicar la técnica de eliminación efectiva de

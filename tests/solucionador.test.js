@@ -4,6 +4,7 @@ import assert from "node:assert/strict";
 import {
   ESTADOS,
   TECNICAS,
+  aplicarColocacion,
   clasificarTablero,
   detectarHiddenPares,
   detectarHiddenQuads,
@@ -1121,6 +1122,63 @@ test("cada paso de resolverLogico es válido contra el tablero del momento", () 
 
   assert.deepEqual(enJuego, tablero);
   assert.equal(tableroEsValido(tablero), true);
+});
+
+test("aplicarColocacion coloca un número válido", () => {
+  const tablero = Array.from({ length: 9 }, () => Array(9).fill(0));
+
+  aplicarColocacion(tablero, { fila: 0, columna: 0, numero: 5 });
+
+  assert.equal(tablero[0][0], 5);
+});
+
+test("aplicarColocacion rechaza un número que contradice la fila", () => {
+  const tablero = Array.from({ length: 9 }, () => Array(9).fill(0));
+  tablero[0][5] = 5;
+  const original = copiarTablero(tablero);
+
+  assert.throws(
+    () => aplicarColocacion(tablero, { fila: 0, columna: 0, numero: 5 }),
+    /colocación inválida/
+  );
+  assert.deepEqual(tablero, original);
+});
+
+test("aplicarColocacion rechaza un número que contradice la columna", () => {
+  const tablero = Array.from({ length: 9 }, () => Array(9).fill(0));
+  tablero[5][0] = 5;
+  const original = copiarTablero(tablero);
+
+  assert.throws(
+    () => aplicarColocacion(tablero, { fila: 0, columna: 0, numero: 5 }),
+    /colocación inválida/
+  );
+  assert.deepEqual(tablero, original);
+});
+
+test("aplicarColocacion rechaza un número que contradice la caja", () => {
+  const tablero = Array.from({ length: 9 }, () => Array(9).fill(0));
+  tablero[1][1] = 5;
+  const original = copiarTablero(tablero);
+
+  assert.throws(
+    () => aplicarColocacion(tablero, { fila: 0, columna: 0, numero: 5 }),
+    /colocación inválida/
+  );
+  assert.deepEqual(tablero, original);
+});
+
+test("un fallo de colocación no deja el tablero parcialmente modificado", () => {
+  const tablero = Array.from({ length: 9 }, () => Array(9).fill(0));
+  tablero[0][8] = 7;
+  tablero[8][0] = 7;
+  const original = copiarTablero(tablero);
+
+  assert.throws(
+    () => aplicarColocacion(tablero, { fila: 0, columna: 0, numero: 7 }),
+    /colocación inválida/
+  );
+  assert.deepEqual(tablero, original);
 });
 
 test("los naked pairs desbloquean un puzzle estancado con singles", () => {
