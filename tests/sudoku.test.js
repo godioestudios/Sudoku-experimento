@@ -151,6 +151,45 @@ function contarSolucionesIndependiente(tablero, limite = 2) {
   return total;
 }
 
+// Solución fija para que las pruebas de búsqueda no dependan de
+// generarTableroResuelto.
+const SOLUCION_FIJA = [
+  [5, 3, 4, 6, 7, 8, 9, 1, 2],
+  [6, 7, 2, 1, 9, 5, 3, 4, 8],
+  [1, 9, 8, 3, 4, 2, 5, 6, 7],
+  [8, 5, 9, 7, 6, 1, 4, 2, 3],
+  [4, 2, 6, 8, 5, 3, 7, 9, 1],
+  [7, 1, 3, 9, 2, 4, 8, 5, 6],
+  [9, 6, 1, 5, 3, 7, 2, 8, 4],
+  [2, 8, 7, 4, 1, 9, 6, 3, 5],
+  [3, 4, 5, 2, 8, 6, 1, 7, 9],
+];
+
+/** RNG determinista para las pruebas de búsqueda. */
+function crearAleatorio(semilla) {
+  let estado = semilla >>> 0;
+  return () => {
+    estado = (estado * 1664525 + 1013904223) >>> 0;
+    return estado / 4294967296;
+  };
+}
+
+function evaluacionLogica(nivel, extra = {}) {
+  return {
+    estado: "resuelto",
+    resuelto: true,
+    nivel,
+    nombre: "prueba",
+    etiqueta: "Prueba",
+    verificado: true,
+    tecnicas: [],
+    pasos: 0,
+    vaciasRestantes: 0,
+    ultimaTecnica: null,
+    ...extra,
+  };
+}
+
 // ------------------------------------------------------------
 // Solución completa
 // ------------------------------------------------------------
@@ -376,4 +415,152 @@ test("contarSoluciones importado por el generador coincide con el contador indep
 
   assert.equal(contarSoluciones(copiar(puzzle), 2), 1);
   assert.equal(contarSolucionesIndependiente(puzzle, 2), 1);
+});
+
+// ------------------------------------------------------------
+// Búsqueda local de dificultad
+// ------------------------------------------------------------
+
+test("la búsqueda acepta de inmediato un candidato de nivel exacto", () => {
+  let llamadas = 0;
+  const diagnostico = {};
+
+  const resultado = crearPuzzleConResultado(SOLUCION_FIJA, 30, {
+    evaluar: () => {
+      llamadas++;
+      return evaluacionLogica(1);
+    },
+    aceptar: (evaluacion) => evaluacion.nivel === 1,
+    puntuar: (evaluacion) => Math.abs(evaluacion.nivel - 1),
+    aleatorio: crearAleatorio(1),
+    maxEvaluaciones: 10,
+    maxIntercambiosPorSemilla: 10,
+    diagnostico,
+  });
+
+  assert.equal(resultado.alcanzado, true);
+  assert.equal(resultado.motivo, "objetivo");
+  assert.equal(resultado.vacias, 30);
+  assert.equal(llamadas, 1);
+  assert.equal(diagnostico.semillas, 1);
+  assert.equal(diagnostico.intercambios, 0);
+  assert.equal(diagnostico.evaluaciones, 1);
+  assert.equal(contarSolucionesIndependiente(resultado.puzzle, 2), 1);
+});
+
+test("la puntuación prefiere un candidato verificado antes que uno bloqueado", () => {
+  let llamadas = 0;
+
+  const resultado = crearPuzzleConResultado(SOLUCION_FIJA, 30, {
+    evaluar: () => {
+      llamadas++;
+      if (llamadas === 1) {
+        return evaluacionLogica(4, {
+          estado: "bloqueado",
+          resuelto: false,
+          verificado: false,
+          vaciasRestantes: 20,
+        });
+      }
+      return evaluacionLogica(0);
+    },
+    aceptar: () => false,
+    puntuar: (evaluacion) =>
+      evaluacion.resuelto && evaluacion.verificado
+        ? 1
+        : Number.POSITIVE_INFINITY,
+    aleatorio: crearAleatorio(2),
+    maxEvaluaciones: 5,
+    maxIntercambiosPorSemilla: 50,
+  });
+
+  assert.equal(resultado.alcanzado, false);
+  assert.equal(resultado.evaluacion.resuelto, true);
+  assert.equal(resultado.evaluacion.verificado, true);
+  assert.equal(resultado.evaluacion.nivel, 0);
+  assert.notEqual(resultado.evaluacion.nivel, 4);
+});
+
+test("cada vecino evaluado conserva vacías, pistas y unicidad sin repetirse", () => {
+  const evaluados = [];
+  const claves = new Set();
+
+  const resultado = crearPuzzleConResultado(SOLUCION_FIJA, 45, {
+    evaluar: (puzzle) => {
+      const clave = puzzle.flat().join("");
+      assert.equal(claves.has(clave), false, "no debe reevaluar un tablero");
+      claves.add(clave);
+      evaluados.push(copiar(puzzle));
+      return evaluacionLogica(0);
+    },
+    aceptar: () => false,
+    puntuar: () => 1,
+    aleatorio: crearAleatorio(3),
+    maxEvaluaciones: 5,
+    maxIntercambiosPorSemilla: 50,
+  });
+
+  assert.ok(evaluados.length >= 2);
+
+  for (const puzzle of evaluados) {
+    assert.equal(contarVacias(puzzle), 45);
+    assert.equal(contarSolucionesIndependiente(puzzle, 2), 1);
+
+    for (let fila = 0; fila < TAM; fila++) {
+      for (let columna = 0; columna < TAM; columna++) {
+        if (puzzle[fila][columna] !== 0) {
+          assert.equal(puzzle[fila][columna], SOLUCION_FIJA[fila][columna]);
+        }
+      }
+    }
+  }
+
+  assert.equal(resultado.alcanzado, false);
+  assert.equal(resultado.vacias, 45);
+});
+
+test("la búsqueda respeta el máximo de evaluaciones", () => {
+  let llamadas = 0;
+  const diagnostico = {};
+
+  const resultado = crearPuzzleConResultado(SOLUCION_FIJA, 30, {
+    evaluar: () => {
+      llamadas++;
+      return evaluacionLogica(0);
+    },
+    aceptar: () => false,
+    puntuar: () => 1,
+    aleatorio: crearAleatorio(4),
+    maxEvaluaciones: 4,
+    maxIntercambiosPorSemilla: 100,
+    diagnostico,
+  });
+
+  assert.equal(llamadas, 4);
+  assert.equal(diagnostico.evaluaciones, 4);
+  assert.equal(resultado.alcanzado, false);
+});
+
+test("un vecino no único se descarta antes de evaluar la dificultad", () => {
+  const diagnostico = {};
+  let evaluaciones = 0;
+
+  const resultado = crearPuzzleConResultado(SOLUCION_FIJA, 52, {
+    evaluar: (puzzle) => {
+      evaluaciones++;
+      assert.equal(contarSolucionesIndependiente(puzzle, 2), 1);
+      return evaluacionLogica(0);
+    },
+    aceptar: () => false,
+    puntuar: () => 1,
+    aleatorio: crearAleatorio(5),
+    maxEvaluaciones: 8,
+    maxIntercambiosPorSemilla: 200,
+    presupuestoMs: 5000,
+    diagnostico,
+  });
+
+  assert.ok(evaluaciones >= 2);
+  assert.ok(diagnostico.rechazosUnicidad > 0);
+  assert.equal(resultado.alcanzado, false);
 });

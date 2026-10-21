@@ -130,9 +130,9 @@ export function copiarTablero(tablero) {
 }
 
 /** Mezcla aleatoria de un array (algoritmo Fisher-Yates). */
-export function mezclar(array) {
+export function mezclar(array, aleatorio = Math.random) {
   for (let i = array.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
+    const j = Math.floor(aleatorio() * (i + 1));
     [array[i], array[j]] = [array[j], array[i]];
   }
   return array;
@@ -176,7 +176,7 @@ export function generarTableroResuelto() {
  *
  * @returns {{puzzle: number[][], vacias: number}}
  */
-function intentoDeVaciado(tableroResuelto, objetivoVacias) {
+function intentoDeVaciado(tableroResuelto, objetivoVacias, aleatorio = Math.random) {
   const puzzle = copiarTablero(tableroResuelto);
 
   const posiciones = [];
@@ -185,7 +185,7 @@ function intentoDeVaciado(tableroResuelto, objetivoVacias) {
       posiciones.push([fila, columna]);
     }
   }
-  mezclar(posiciones);
+  mezclar(posiciones, aleatorio);
 
   let vacias = 0;
   for (const [fila, columna] of posiciones) {
@@ -202,6 +202,63 @@ function intentoDeVaciado(tableroResuelto, objetivoVacias) {
   }
 
   return { puzzle, vacias };
+}
+
+/** Clave estable de un tablero para no evaluar dos veces el mismo candidato. */
+function claveTablero(tablero) {
+  return tablero.map((fila) => fila.join("")).join("|");
+}
+
+function esEvaluacionVerificada(evaluacion) {
+  return Boolean(evaluacion?.resuelto && evaluacion?.verificado);
+}
+
+/**
+ * Puntuación de búsqueda: menor es mejor. Sin `puntuar` solo distingue
+ * candidatos verificados de bloqueados/no verificados; el generador
+ * aporta la distancia al nivel pedido.
+ */
+function crearPuntuacion(evaluacion, puntuar) {
+  if (!evaluacion) return Number.POSITIVE_INFINITY;
+  if (typeof puntuar !== "function") {
+    return esEvaluacionVerificada(evaluacion)
+      ? 0
+      : Number.POSITIVE_INFINITY;
+  }
+
+  const puntuacion = puntuar(evaluacion);
+  return Number.isFinite(puntuacion) ? puntuacion : Number.POSITIVE_INFINITY;
+}
+
+/**
+ * Genera un vecino con el mismo número de vacías: restaura una pista y
+ * vacía otra casilla usando siempre el valor de la solución original.
+ */
+function intercambiarPista(puzzle, tableroResuelto, aleatorio) {
+  const pistas = [];
+  const vacias = [];
+
+  for (let fila = 0; fila < TAMAÑO; fila++) {
+    for (let columna = 0; columna < TAMAÑO; columna++) {
+      if (puzzle[fila][columna] === 0) {
+        vacias.push([fila, columna]);
+      } else {
+        pistas.push([fila, columna]);
+      }
+    }
+  }
+
+  if (pistas.length === 0 || vacias.length === 0) return null;
+
+  const [filaPista, columnaPista] =
+    pistas[Math.floor(aleatorio() * pistas.length)];
+  const [filaVacia, columnaVacia] =
+    vacias[Math.floor(aleatorio() * vacias.length)];
+
+  const vecino = copiarTablero(puzzle);
+  vecino[filaPista][columnaPista] = 0;
+  vecino[filaVacia][columnaVacia] = tableroResuelto[filaVacia][columnaVacia];
+  return vecino;
 }
 
 /**
@@ -263,6 +320,12 @@ function esSolucionCompleta(tablero) {
  * ("dificultad", "presupuesto" o "intentos") para que la interfaz no
  * presente la dificultad como garantizada.
  *
+ * Si la semilla no cumple el criterio exacto, la búsqueda local prueba
+ * vecinos que restauran una pista y vacían otra casilla, manteniendo el
+ * número de vacías. Cada vecino se comprueba con `contarSoluciones`
+ * antes de evaluarse. `puntuar` ordena los candidatos durante la
+ * búsqueda; `aceptar` sigue siendo el único criterio de éxito.
+ *
  * Nota: "vacías" mide casillas vacías, no dificultad lógica real;
  * un puzzle con 56 vacías puede ser más fácil de resolver que otro
  * con menos si sus técnicas de deducción son más directas.
@@ -272,8 +335,18 @@ function esSolucionCompleta(tablero) {
  * @param {{
  *   maxIntentos?: number,
  *   presupuestoMs?: number,
+ *   maxEvaluaciones?: number,
+ *   maxIntercambiosPorSemilla?: number,
  *   evaluar?: (puzzle: number[][]) => object,
- *   aceptar?: (evaluacion: object) => boolean
+ *   aceptar?: (evaluacion: object) => boolean,
+ *   puntuar?: (evaluacion: object) => number,
+ *   aleatorio?: () => number,
+ *   diagnostico?: {
+ *     semillas?: number,
+ *     intercambios?: number,
+ *     evaluaciones?: number,
+ *     rechazosUnicidad?: number
+ *   }
  * }} opciones
  * @returns {{
  *   puzzle: number[][],
@@ -303,51 +376,155 @@ export function crearPuzzleConResultado(tableroResuelto, objetivoVacias, opcione
 
   const maxIntentos = Math.max(1, opciones.maxIntentos ?? 5);
   const presupuestoMs = opciones.presupuestoMs ?? 3000;
+  const maxEvaluaciones = Math.max(0, opciones.maxEvaluaciones ?? 500);
+  const maxIntercambiosPorSemilla = Math.max(
+    0,
+    opciones.maxIntercambiosPorSemilla ?? 400
+  );
   const evaluar =
     typeof opciones.evaluar === "function" ? opciones.evaluar : null;
   const aceptar =
     typeof opciones.aceptar === "function" ? opciones.aceptar : () => true;
-  const inicio = performance.now();
+  const puntuar =
+    typeof opciones.puntuar === "function" ? opciones.puntuar : null;
+  const aleatorio =
+    typeof opciones.aleatorio === "function" ? opciones.aleatorio : Math.random;
+  const diagnostico = opciones.diagnostico ?? null;
 
+  if (diagnostico) {
+    diagnostico.semillas = 0;
+    diagnostico.intercambios = 0;
+    diagnostico.evaluaciones = 0;
+    diagnostico.rechazosUnicidad = 0;
+  }
+
+  const contar = (campo) => {
+    if (diagnostico) diagnostico[campo] = (diagnostico[campo] ?? 0) + 1;
+  };
+
+  const inicio = performance.now();
+  let evaluaciones = 0;
   let mejor = null;
   let presupuestoAgotado = false;
+  const visitados = new Set();
+
+  const tiempoAgotado = () => performance.now() - inicio >= presupuestoMs;
+  const evaluacionesAgotadas = () => evaluaciones >= maxEvaluaciones;
+
+  const crearCandidato = (puzzle, vacias) => {
+    let evaluacion = null;
+
+    if (evaluar && !evaluacionesAgotadas()) {
+      evaluacion = evaluar(puzzle);
+      evaluaciones++;
+      contar("evaluaciones");
+    }
+
+    const cumpleLogica =
+      !evaluar || (evaluacion !== null && aceptar(evaluacion));
+
+    return {
+      puzzle,
+      vacias,
+      evaluacion,
+      cumpleLogica,
+      puntuacion: crearPuntuacion(evaluacion, puntuar),
+    };
+  };
+
+  const esMejor = (candidato) => {
+    if (!mejor) return true;
+    if (evaluar) {
+      const candidatoVerificado = esEvaluacionVerificada(candidato.evaluacion);
+      const mejorVerificado = esEvaluacionVerificada(mejor.evaluacion);
+      if (candidatoVerificado !== mejorVerificado) return candidatoVerificado;
+      if (candidatoVerificado && candidato.puntuacion !== mejor.puntuacion) {
+        return candidato.puntuacion < mejor.puntuacion;
+      }
+    }
+    return candidato.vacias > mejor.vacias;
+  };
+
+  const resultadoExito = (candidato) => ({
+    puzzle: candidato.puzzle,
+    vacias: candidato.vacias,
+    evaluacion: candidato.evaluacion,
+    alcanzado: true,
+    motivo: "objetivo",
+  });
 
   for (let intento = 0; intento < maxIntentos; intento++) {
     // El primer intento corre siempre; los demás solo si queda presupuesto
-    if (intento > 0 && performance.now() - inicio >= presupuestoMs) {
+    if (intento > 0 && (tiempoAgotado() || evaluacionesAgotadas())) {
       presupuestoAgotado = true;
       break;
     }
 
-    const { puzzle, vacias } = intentoDeVaciado(tableroResuelto, objetivoVacias);
-    const evaluacion = evaluar ? evaluar(puzzle) : null;
-    const cumpleLogica = !evaluar || aceptar(evaluacion);
-    const cumpleVacias = vacias >= objetivoVacias;
-    const candidato = { puzzle, vacias, evaluacion, cumpleLogica };
+    const { puzzle, vacias } = intentoDeVaciado(
+      tableroResuelto,
+      objetivoVacias,
+      aleatorio
+    );
+    contar("semillas");
+    visitados.add(claveTablero(puzzle));
 
-    if (cumpleVacias && cumpleLogica) {
-      return {
-        puzzle,
-        vacias,
-        evaluacion,
-        alcanzado: true,
-        motivo: "objetivo",
-      };
+    let actual = crearCandidato(puzzle, vacias);
+
+    if (actual.cumpleLogica && vacias >= objetivoVacias) {
+      return resultadoExito(actual);
     }
 
-    if (
-      !mejor ||
-      (cumpleLogica && !mejor.cumpleLogica) ||
-      (cumpleLogica === mejor.cumpleLogica &&
-        (vacias > mejor.vacias ||
-          (vacias === mejor.vacias &&
-            (evaluacion?.nivel ?? -1) > (mejor.evaluacion?.nivel ?? -1))))
+    if (esMejor(actual)) mejor = actual;
+
+    // Sin evaluador, o si la semilla no alcanzó las vacías objetivo, no
+    // hay búsqueda local: el vecino conservaría un número distinto.
+    if (!evaluar || vacias < objetivoVacias) continue;
+
+    for (
+      let intercambio = 0;
+      intercambio < maxIntercambiosPorSemilla;
+      intercambio++
     ) {
-      mejor = candidato;
+      if (tiempoAgotado() || evaluacionesAgotadas()) {
+        presupuestoAgotado = true;
+        break;
+      }
+
+      const vecino = intercambiarPista(actual.puzzle, tableroResuelto, aleatorio);
+      if (!vecino) break;
+      contar("intercambios");
+
+      const clave = claveTablero(vecino);
+      if (visitados.has(clave)) continue;
+      visitados.add(clave);
+
+      // La unicidad se comprueba antes de evaluar la dificultad.
+      if (contarSoluciones(vecino, 2) !== 1) {
+        contar("rechazosUnicidad");
+        continue;
+      }
+
+      if (tiempoAgotado() || evaluacionesAgotadas()) {
+        presupuestoAgotado = true;
+        break;
+      }
+
+      const candidato = crearCandidato(vecino, actual.vacias);
+
+      if (candidato.cumpleLogica && candidato.vacias >= objetivoVacias) {
+        return resultadoExito(candidato);
+      }
+
+      if (esMejor(candidato)) mejor = candidato;
+
+      // Se aceptan mejoras y jugadas laterales; nunca un empeoramiento.
+      if (candidato.puntuacion <= actual.puntuacion) actual = candidato;
     }
+
+    if (presupuestoAgotado) break;
   }
 
-  if (!presupuestoAgotado && performance.now() - inicio >= presupuestoMs) {
+  if (!presupuestoAgotado && (tiempoAgotado() || evaluacionesAgotadas())) {
     presupuestoAgotado = true;
   }
 

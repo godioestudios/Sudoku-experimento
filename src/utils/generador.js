@@ -6,6 +6,7 @@ import {
   generarTableroResuelto,
 } from "./sudoku.js";
 import {
+  CRITERIOS_DIFICULTAD_LOGICA,
   cumpleDificultadLogica,
   evaluarDificultadLogica,
 } from "./solucionador.js";
@@ -17,10 +18,17 @@ export function generarPartida(nivel) {
     throw new Error(`Dificultad desconocida: ${nivel}`);
   }
 
+  const nivelObjetivo = CRITERIOS_DIFICULTAD_LOGICA[nivel].nivel;
   const tableroSolucion = generarTableroResuelto();
   const resultado = crearPuzzleConResultado(tableroSolucion, objetivoVacias, {
     evaluar: evaluarDificultadLogica,
     aceptar: (evaluacion) => cumpleDificultadLogica(evaluacion, nivel),
+    puntuar: (evaluacion) => {
+      if (!evaluacion.resuelto || !evaluacion.verificado) {
+        return Number.POSITIVE_INFINITY;
+      }
+      return Math.abs(evaluacion.nivel - nivelObjetivo);
+    },
   });
   const puzzle = resultado.puzzle;
   const evaluacion =
