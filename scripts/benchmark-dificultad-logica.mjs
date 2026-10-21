@@ -15,12 +15,19 @@ const percentil = (valores, p) => {
 for (const nivel of niveles) {
   const resultados = [];
   const tiempos = [];
+  const verificaciones = [];
+  const nodos = [];
+  let interrumpidas = 0;
 
   for (let i = 0; i < intentos; i++) {
     const inicio = performance.now();
     const partida = generarPartida(nivel);
     tiempos.push(performance.now() - inicio);
     resultados.push(partida.dificultadLogica);
+    const diagnostico = partida.dificultadLogica.diagnostico;
+    verificaciones.push(diagnostico.verificacionesUnicidad);
+    nodos.push(diagnostico.nodosUnicidad);
+    interrumpidas += diagnostico.interrupcionesUnicidad;
   }
 
   const alcanzados = resultados.filter((resultado) => resultado.alcanzada);
@@ -41,6 +48,11 @@ for (const nivel of niveles) {
     `Tiempo: media ${media(tiempos).toFixed(0)} ms · ` +
       `p95 ${percentil(tiempos, 0.95).toFixed(0)} ms · ` +
       `máx ${Math.max(...tiempos).toFixed(0)} ms`
+  );
+  console.log(
+    `Unicidad: media ${media(verificaciones).toFixed(0)} comprobaciones · ` +
+      `media ${media(nodos).toFixed(0)} nodos · ` +
+      `${interrumpidas} interrumpidas`
   );
   console.log(
     "Etiquetas: " +

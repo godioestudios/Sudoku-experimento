@@ -97,13 +97,82 @@ export function resolverSudoku(tablero) {
   return false; // Ningún número sirve: retroceder
 }
 
+const INTERVALO_CHEQUEO_TIEMPO = 512;
+
+function agotarPresupuesto(presupuesto, motivo) {
+  if (!presupuesto.agotado) {
+    presupuesto.agotado = true;
+    presupuesto.motivo = motivo;
+  }
+}
+
+/** Comprueba el presupuesto antes de iniciar trabajo costoso. */
+function presupuestoExcedido(presupuesto, comprobarTiempo = true) {
+  if (!presupuesto) return false;
+  if (presupuesto.agotado) return true;
+
+  if (presupuesto.nodos >= presupuesto.maxNodos) {
+    agotarPresupuesto(presupuesto, "nodos");
+    return true;
+  }
+
+  if (
+    comprobarTiempo &&
+    presupuesto.ahora() - presupuesto.inicio >= presupuesto.limiteMs
+  ) {
+    agotarPresupuesto(presupuesto, "tiempo");
+    return true;
+  }
+
+  return false;
+}
+
+function consumirNodo(presupuesto) {
+  if (!presupuesto) return true;
+  if (presupuestoExcedido(presupuesto, false)) return false;
+
+  presupuesto.nodos++;
+  if (presupuesto.nodos % INTERVALO_CHEQUEO_TIEMPO === 0) {
+    return !presupuestoExcedido(presupuesto);
+  }
+
+  return true;
+}
+
+function crearPresupuesto({ presupuestoMs, maxNodosUnicidad, ahora }) {
+  return {
+    inicio: ahora(),
+    limiteMs: Math.max(0, presupuestoMs),
+    maxNodos: Math.max(0, maxNodosUnicidad),
+    nodos: 0,
+    verificaciones: 0,
+    interrumpidas: 0,
+    tiempoUnicidadMs: 0,
+    tiempoEvaluacionMs: 0,
+    agotado: false,
+    motivo: null,
+    ahora,
+  };
+}
+
 /**
- * Cuenta soluciones del tablero (se detiene al llegar al límite).
- * Sirve para verificar que un puzzle tiene solución única.
+ * Cuenta soluciones con un presupuesto compartido. Devuelve siempre un
+ * resultado discriminado: `completa: false` significa que la búsqueda se
+ * interrumpió y `total` no demuestra nada sobre el tablero.
  */
-export function contarSoluciones(tablero, limite = 2) {
+function contarSolucionesConPresupuesto(
+  tablero,
+  limite = 2,
+  presupuesto = null
+) {
+  if (!consumirNodo(presupuesto)) {
+    return { total: 0, completa: false, motivo: presupuesto.motivo };
+  }
+
   const casilla = buscarCasillaVacia(tablero);
-  if (casilla === null) return 1; // Encontré una solución completa
+  if (casilla === null) {
+    return { total: 1, completa: true, motivo: null }; // Solución completa
+  }
 
   const [fila, columna] = casilla;
   let total = 0;
@@ -111,13 +180,44 @@ export function contarSoluciones(tablero, limite = 2) {
   for (const numero of VALORES) {
     if (esValido(tablero, fila, columna, numero)) {
       tablero[fila][columna] = numero;
-      total += contarSoluciones(tablero, limite - total);
-      tablero[fila][columna] = 0; // Restaurar
-      if (total >= limite) return total;
+      const resultado = contarSolucionesConPresupuesto(
+        tablero,
+        limite - total,
+        presupuesto
+      );
+      tablero[fila][columna] = 0; // Restaurar también al interrumpir
+
+      if (!resultado.completa) return resultado;
+
+      total += resultado.total;
+      if (total >= limite) return { total, completa: true, motivo: null };
     }
   }
 
-  return total;
+  return { total, completa: true, motivo: null };
+}
+
+/**
+ * Cuenta soluciones del tablero (se detiene al llegar al límite).
+ * Sirve para verificar que un puzzle tiene solución única.
+ */
+export function contarSoluciones(tablero, limite = 2) {
+  return contarSolucionesConPresupuesto(tablero, limite, null).total;
+}
+
+function verificarUnicidad(tablero, presupuesto) {
+  if (!presupuesto) {
+    return contarSolucionesConPresupuesto(tablero, 2, null);
+  }
+
+  const inicio = presupuesto.ahora();
+  const resultado = contarSolucionesConPresupuesto(tablero, 2, presupuesto);
+
+  presupuesto.verificaciones++;
+  presupuesto.tiempoUnicidadMs += presupuesto.ahora() - inicio;
+  if (!resultado.completa) presupuesto.interrumpidas++;
+
+  return resultado;
 }
 
 // ============================================================
@@ -174,9 +274,19 @@ export function generarTableroResuelto() {
  * tampoco se podrá vaciar más adelante. Por eso un mismo orden no
  * mejora repitiéndolo: cada intento necesita un orden nuevo.
  *
- * @returns {{puzzle: number[][], vacias: number}}
+ * @returns {{
+ *   puzzle: number[][],
+ *   vacias: number,
+ *   interrumpido: boolean,
+ *   motivo: "tiempo"|"nodos"|null
+ * }}
  */
-function intentoDeVaciado(tableroResuelto, objetivoVacias, aleatorio = Math.random) {
+function intentoDeVaciado(
+  tableroResuelto,
+  objetivoVacias,
+  aleatorio = Math.random,
+  presupuesto = null
+) {
   const puzzle = copiarTablero(tableroResuelto);
 
   const posiciones = [];
@@ -191,17 +301,40 @@ function intentoDeVaciado(tableroResuelto, objetivoVacias, aleatorio = Math.rand
   for (const [fila, columna] of posiciones) {
     if (vacias >= objetivoVacias) break;
 
+    if (presupuestoExcedido(presupuesto)) {
+      return {
+        puzzle,
+        vacias,
+        interrumpido: true,
+        motivo: presupuesto?.motivo ?? null,
+      };
+    }
+
     const guardado = puzzle[fila][columna];
     puzzle[fila][columna] = 0;
 
-    if (contarSoluciones(puzzle, 2) === 1) {
+    const chequeo = verificarUnicidad(puzzle, presupuesto);
+
+    if (!chequeo.completa) {
+      // Sin prueba completa no se confirma el vaciado. El puzzle vuelve al
+      // último estado cuya unicidad sí quedó demostrada.
+      puzzle[fila][columna] = guardado;
+      return {
+        puzzle,
+        vacias,
+        interrumpido: true,
+        motivo: chequeo.motivo,
+      };
+    }
+
+    if (chequeo.total === 1) {
       vacias++; // Solución sigue siendo única: la dejamos vacía
     } else {
       puzzle[fila][columna] = guardado; // Varias soluciones: la restauramos
     }
   }
 
-  return { puzzle, vacias };
+  return { puzzle, vacias, interrumpido: false, motivo: null };
 }
 
 /** Clave estable de un tablero para no evaluar dos veces el mismo candidato. */
@@ -322,9 +455,14 @@ function esSolucionCompleta(tablero) {
  *
  * Si la semilla no cumple el criterio exacto, la búsqueda local prueba
  * vecinos que restauran una pista y vacían otra casilla, manteniendo el
- * número de vacías. Cada vecino se comprueba con `contarSoluciones`
+ * número de vacías. Cada vecino se comprueba con el conteo controlado
  * antes de evaluarse. `puntuar` ordena los candidatos durante la
  * búsqueda; `aceptar` sigue siendo el único criterio de éxito.
+ *
+ * Las comprobaciones de unicidad comparten un presupuesto con la
+ * generación de la semilla y con las evaluaciones lógicas. Si el
+ * presupuesto se agota, la búsqueda se interrumpe y se devuelve el
+ * último candidato cuya unicidad quedó demostrada.
  *
  * Nota: "vacías" mide casillas vacías, no dificultad lógica real;
  * un puzzle con 56 vacías puede ser más fácil de resolver que otro
@@ -335,17 +473,27 @@ function esSolucionCompleta(tablero) {
  * @param {{
  *   maxIntentos?: number,
  *   presupuestoMs?: number,
+ *   maxNodosUnicidad?: number,
  *   maxEvaluaciones?: number,
  *   maxIntercambiosPorSemilla?: number,
  *   evaluar?: (puzzle: number[][]) => object,
  *   aceptar?: (evaluacion: object) => boolean,
  *   puntuar?: (evaluacion: object) => number,
  *   aleatorio?: () => number,
+ *   ahora?: () => number,
  *   diagnostico?: {
  *     semillas?: number,
+ *     semillasInterrumpidas?: number,
  *     intercambios?: number,
  *     evaluaciones?: number,
- *     rechazosUnicidad?: number
+ *     rechazosUnicidad?: number,
+ *     verificacionesUnicidad?: number,
+ *     nodosUnicidad?: number,
+ *     interrupcionesUnicidad?: number,
+ *     tiempoUnicidadMs?: number,
+ *     tiempoEvaluacionMs?: number,
+ *     tiempoTotalMs?: number,
+ *     motivoAgotamiento?: string|null
  *   }
  * }} opciones
  * @returns {{
@@ -353,7 +501,11 @@ function esSolucionCompleta(tablero) {
  *   vacias: number,
  *   evaluacion: object|null,
  *   alcanzado: boolean,
- *   motivo: "objetivo"|"dificultad"|"presupuesto"|"intentos"
+ *   motivo: "objetivo"|"dificultad"|"presupuesto"|"intentos",
+ *   busquedaCompleta: boolean,
+ *   presupuestoAgotado: boolean,
+ *   motivoAgotamiento: string|null,
+ *   diagnostico: object|null
  * }}
  * @throws {TypeError} Si el objetivo no es un entero dentro del rango.
  */
@@ -376,6 +528,7 @@ export function crearPuzzleConResultado(tableroResuelto, objetivoVacias, opcione
 
   const maxIntentos = Math.max(1, opciones.maxIntentos ?? 5);
   const presupuestoMs = opciones.presupuestoMs ?? 3000;
+  const maxNodosUnicidad = opciones.maxNodosUnicidad ?? Infinity;
   const maxEvaluaciones = Math.max(0, opciones.maxEvaluaciones ?? 500);
   const maxIntercambiosPorSemilla = Math.max(
     0,
@@ -389,10 +542,19 @@ export function crearPuzzleConResultado(tableroResuelto, objetivoVacias, opcione
     typeof opciones.puntuar === "function" ? opciones.puntuar : null;
   const aleatorio =
     typeof opciones.aleatorio === "function" ? opciones.aleatorio : Math.random;
+  const ahora =
+    typeof opciones.ahora === "function" ? opciones.ahora : () => performance.now();
   const diagnostico = opciones.diagnostico ?? null;
+
+  const presupuesto = crearPresupuesto({
+    presupuestoMs,
+    maxNodosUnicidad,
+    ahora,
+  });
 
   if (diagnostico) {
     diagnostico.semillas = 0;
+    diagnostico.semillasInterrumpidas = 0;
     diagnostico.intercambios = 0;
     diagnostico.evaluaciones = 0;
     diagnostico.rechazosUnicidad = 0;
@@ -402,20 +564,42 @@ export function crearPuzzleConResultado(tableroResuelto, objetivoVacias, opcione
     if (diagnostico) diagnostico[campo] = (diagnostico[campo] ?? 0) + 1;
   };
 
-  const inicio = performance.now();
+  const sincronizarDiagnostico = () => {
+    if (!diagnostico) return;
+    diagnostico.verificacionesUnicidad = presupuesto.verificaciones;
+    diagnostico.nodosUnicidad = presupuesto.nodos;
+    diagnostico.interrupcionesUnicidad = presupuesto.interrumpidas;
+    diagnostico.tiempoUnicidadMs = presupuesto.tiempoUnicidadMs;
+    diagnostico.tiempoEvaluacionMs = presupuesto.tiempoEvaluacionMs;
+    diagnostico.tiempoTotalMs = ahora() - presupuesto.inicio;
+    diagnostico.motivoAgotamiento = presupuesto.motivo;
+  };
+
   let evaluaciones = 0;
   let mejor = null;
   let presupuestoAgotado = false;
   const visitados = new Set();
 
-  const tiempoAgotado = () => performance.now() - inicio >= presupuestoMs;
-  const evaluacionesAgotadas = () => evaluaciones >= maxEvaluaciones;
+  const tiempoAgotado = () => presupuestoExcedido(presupuesto);
+  const evaluacionesAgotadas = () => {
+    if (evaluaciones >= maxEvaluaciones) {
+      agotarPresupuesto(presupuesto, "evaluaciones");
+      return true;
+    }
+    return false;
+  };
 
   const crearCandidato = (puzzle, vacias) => {
     let evaluacion = null;
 
-    if (evaluar && !evaluacionesAgotadas()) {
+    if (
+      evaluar &&
+      !evaluacionesAgotadas() &&
+      !presupuestoExcedido(presupuesto)
+    ) {
+      const inicioEvaluacion = ahora();
       evaluacion = evaluar(puzzle);
+      presupuesto.tiempoEvaluacionMs += ahora() - inicioEvaluacion;
       evaluaciones++;
       contar("evaluaciones");
     }
@@ -445,13 +629,20 @@ export function crearPuzzleConResultado(tableroResuelto, objetivoVacias, opcione
     return candidato.vacias > mejor.vacias;
   };
 
-  const resultadoExito = (candidato) => ({
-    puzzle: candidato.puzzle,
-    vacias: candidato.vacias,
-    evaluacion: candidato.evaluacion,
-    alcanzado: true,
-    motivo: "objetivo",
-  });
+  const resultadoExito = (candidato) => {
+    sincronizarDiagnostico();
+    return {
+      puzzle: candidato.puzzle,
+      vacias: candidato.vacias,
+      evaluacion: candidato.evaluacion,
+      alcanzado: true,
+      motivo: "objetivo",
+      busquedaCompleta: !presupuesto.agotado,
+      presupuestoAgotado: presupuesto.agotado,
+      motivoAgotamiento: presupuesto.motivo,
+      diagnostico,
+    };
+  };
 
   for (let intento = 0; intento < maxIntentos; intento++) {
     // El primer intento corre siempre; los demás solo si queda presupuesto
@@ -460,21 +651,33 @@ export function crearPuzzleConResultado(tableroResuelto, objetivoVacias, opcione
       break;
     }
 
-    const { puzzle, vacias } = intentoDeVaciado(
+    const semilla = intentoDeVaciado(
       tableroResuelto,
       objetivoVacias,
-      aleatorio
+      aleatorio,
+      presupuesto
     );
+    const { puzzle, vacias } = semilla;
     contar("semillas");
+    if (semilla.interrumpido) contar("semillasInterrumpidas");
     visitados.add(claveTablero(puzzle));
 
     let actual = crearCandidato(puzzle, vacias);
 
-    if (actual.cumpleLogica && vacias >= objetivoVacias) {
+    if (
+      !semilla.interrumpido &&
+      actual.cumpleLogica &&
+      vacias >= objetivoVacias
+    ) {
       return resultadoExito(actual);
     }
 
     if (esMejor(actual)) mejor = actual;
+
+    if (semilla.interrumpido) {
+      presupuestoAgotado = true;
+      break;
+    }
 
     // Sin evaluador, o si la semilla no alcanzó las vacías objetivo, no
     // hay búsqueda local: el vecino conservaría un número distinto.
@@ -499,7 +702,15 @@ export function crearPuzzleConResultado(tableroResuelto, objetivoVacias, opcione
       visitados.add(clave);
 
       // La unicidad se comprueba antes de evaluar la dificultad.
-      if (contarSoluciones(vecino, 2) !== 1) {
+      const chequeo = verificarUnicidad(vecino, presupuesto);
+
+      if (!chequeo.completa) {
+        // Interrumpido no significa no único: no se evalúa ni se acepta.
+        presupuestoAgotado = true;
+        break;
+      }
+
+      if (chequeo.total !== 1) {
         contar("rechazosUnicidad");
         continue;
       }
@@ -528,6 +739,8 @@ export function crearPuzzleConResultado(tableroResuelto, objetivoVacias, opcione
     presupuestoAgotado = true;
   }
 
+  sincronizarDiagnostico();
+
   const cumpleVacias = mejor.vacias >= objetivoVacias;
   const motivo = cumpleVacias
     ? "dificultad"
@@ -541,6 +754,10 @@ export function crearPuzzleConResultado(tableroResuelto, objetivoVacias, opcione
     evaluacion: mejor.evaluacion,
     alcanzado: false,
     motivo,
+    busquedaCompleta: !presupuesto.agotado,
+    presupuestoAgotado: presupuesto.agotado,
+    motivoAgotamiento: presupuesto.motivo,
+    diagnostico,
   };
 }
 

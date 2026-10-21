@@ -20,6 +20,7 @@ export function generarPartida(nivel) {
 
   const nivelObjetivo = CRITERIOS_DIFICULTAD_LOGICA[nivel].nivel;
   const tableroSolucion = generarTableroResuelto();
+  const diagnostico = {};
   const resultado = crearPuzzleConResultado(tableroSolucion, objetivoVacias, {
     evaluar: evaluarDificultadLogica,
     aceptar: (evaluacion) => cumpleDificultadLogica(evaluacion, nivel),
@@ -29,10 +30,28 @@ export function generarPartida(nivel) {
       }
       return Math.abs(evaluacion.nivel - nivelObjetivo);
     },
+    diagnostico,
   });
   const puzzle = resultado.puzzle;
+  // No iniciar una evaluación nueva si el presupuesto de generación ya se
+  // agotó: sin evaluación no se puede atribuir una dificultad exacta.
   const evaluacion =
-    resultado.evaluacion ?? evaluarDificultadLogica(resultado.puzzle);
+    resultado.evaluacion ??
+    (resultado.presupuestoAgotado
+      ? null
+      : evaluarDificultadLogica(resultado.puzzle));
+  const evaluacionInformada = evaluacion ?? {
+    estado: "sin-evaluar",
+    resuelto: false,
+    nivel: null,
+    nombre: "sin-evaluar",
+    etiqueta: "Sin evaluar",
+    verificado: false,
+    tecnicas: [],
+    pasos: 0,
+    vaciasRestantes: null,
+    ultimaTecnica: null,
+  };
 
   // resultado.alcanzado ya exige el objetivo de vacías y cumpleDificultadLogica.
   // La etiqueta es solo informativa: no decide la aceptación.
@@ -47,17 +66,18 @@ export function generarPartida(nivel) {
       solicitada: nivel,
       alcanzada,
       motivo: resultado.motivo,
-      estado: evaluacion.estado,
-      nivel: evaluacion.nivel,
-      nombre: evaluacion.nombre,
-      etiqueta: evaluacion.etiqueta,
-      verificado: evaluacion.verificado,
-      tecnicas: evaluacion.tecnicas,
-      pasos: evaluacion.pasos,
+      estado: evaluacionInformada.estado,
+      nivel: evaluacionInformada.nivel,
+      nombre: evaluacionInformada.nombre,
+      etiqueta: evaluacionInformada.etiqueta,
+      verificado: evaluacionInformada.verificado,
+      tecnicas: evaluacionInformada.tecnicas,
+      pasos: evaluacionInformada.pasos,
       vacias: resultado.vacias,
       vaciasObjetivo: objetivoVacias,
-      vaciasRestantes: evaluacion.vaciasRestantes,
-      ultimaTecnica: evaluacion.ultimaTecnica,
+      vaciasRestantes: evaluacionInformada.vaciasRestantes,
+      ultimaTecnica: evaluacionInformada.ultimaTecnica,
+      diagnostico,
     },
   };
 }

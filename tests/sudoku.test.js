@@ -564,3 +564,113 @@ test("un vecino no único se descarta antes de evaluar la dificultad", () => {
   assert.ok(diagnostico.rechazosUnicidad > 0);
   assert.equal(resultado.alcanzado, false);
 });
+
+// ------------------------------------------------------------
+// Presupuesto cooperativo de unicidad
+// ------------------------------------------------------------
+
+test("contarSoluciones conserva el conteo numérico completo", () => {
+  const unica = crearPuzzle(SOLUCION_FIJA, DIFICULTADES.facil);
+  assert.equal(contarSoluciones(copiar(unica), 2), 1);
+
+  const multiples = Array.from({ length: TAM }, () => Array(TAM).fill(0));
+  assert.equal(contarSoluciones(multiples, 2), 2);
+
+  // (0,8) no admite ningún número: la fila usa 1..8, la columna y la caja
+  // ya contienen el 9. No hay duplicados, pero tampoco solución.
+  const sinSolucion = Array.from({ length: TAM }, () => Array(TAM).fill(0));
+  sinSolucion[0] = [1, 2, 3, 4, 5, 6, 7, 8, 0];
+  sinSolucion[1][7] = 9;
+  sinSolucion[3][8] = 9;
+  assert.equal(contarSoluciones(copiar(sinSolucion), 2), 0);
+});
+
+test("el límite de nodos interrumpe sin aceptar ni confundir el conteo", () => {
+  const diagnostico = {};
+  const resultado = crearPuzzleConResultado(SOLUCION_FIJA, 30, {
+    evaluar: () => evaluacionLogica(0),
+    aceptar: () => true,
+    aleatorio: crearAleatorio(6),
+    maxNodosUnicidad: 10,
+    diagnostico,
+  });
+
+  assert.equal(resultado.alcanzado, false);
+  assert.equal(resultado.presupuestoAgotado, true);
+  assert.equal(resultado.busquedaCompleta, false);
+  assert.equal(resultado.motivoAgotamiento, "nodos");
+  assert.equal(diagnostico.motivoAgotamiento, "nodos");
+  assert.equal(diagnostico.nodosUnicidad, 10);
+  assert.ok(diagnostico.interrupcionesUnicidad > 0);
+  assert.equal(diagnostico.rechazosUnicidad, 0);
+  assert.equal(diagnostico.evaluaciones, 0);
+
+  // La semilla cortada conserva el último estado confirmado como único y
+  // no deja asignaciones temporales del DFS.
+  assert.ok(resultado.vacias > 0);
+  assert.ok(resultado.vacias < 30);
+  assert.equal(contarVacias(resultado.puzzle), resultado.vacias);
+  assert.equal(esSudokuValido(resultado.puzzle), true);
+  assert.equal(contarSolucionesIndependiente(resultado.puzzle, 2), 1);
+});
+
+test("un vecino interrumpido no se evalúa ni cuenta como rechazo", () => {
+  const base = {};
+  crearPuzzleConResultado(SOLUCION_FIJA, 1, {
+    evaluar: () => evaluacionLogica(0),
+    aceptar: () => false,
+    aleatorio: crearAleatorio(6),
+    maxIntercambiosPorSemilla: 0,
+    diagnostico: base,
+  });
+  assert.ok(base.nodosUnicidad > 0);
+
+  let llamadas = 0;
+  const diagnostico = {};
+  const resultado = crearPuzzleConResultado(SOLUCION_FIJA, 1, {
+    evaluar: () => {
+      llamadas++;
+      return evaluacionLogica(0);
+    },
+    aceptar: () => false,
+    puntuar: () => 1,
+    aleatorio: crearAleatorio(6),
+    maxNodosUnicidad: base.nodosUnicidad + 1,
+    maxIntercambiosPorSemilla: 20,
+    diagnostico,
+  });
+
+  assert.equal(resultado.alcanzado, false);
+  assert.equal(resultado.presupuestoAgotado, true);
+  assert.equal(diagnostico.motivoAgotamiento, "nodos");
+  assert.equal(diagnostico.interrupcionesUnicidad, 1);
+  assert.equal(diagnostico.rechazosUnicidad, 0);
+  assert.ok(llamadas >= 2);
+
+  // Todas las verificaciones completas fueron únicas y se evaluaron; la
+  // interrumpida no sumó una evaluación ni un rechazo concluyente.
+  assert.equal(
+    llamadas,
+    diagnostico.verificacionesUnicidad - diagnostico.interrupcionesUnicidad
+  );
+});
+
+test("el presupuesto de tiempo se comprueba antes de iniciar el conteo", () => {
+  const diagnostico = {};
+  const resultado = crearPuzzleConResultado(SOLUCION_FIJA, 30, {
+    evaluar: () => evaluacionLogica(0),
+    aceptar: () => true,
+    presupuestoMs: 0,
+    diagnostico,
+  });
+
+  assert.equal(resultado.alcanzado, false);
+  assert.equal(resultado.presupuestoAgotado, true);
+  assert.equal(resultado.motivo, "presupuesto");
+  assert.equal(diagnostico.motivoAgotamiento, "tiempo");
+  assert.equal(diagnostico.verificacionesUnicidad, 0);
+  assert.equal(diagnostico.nodosUnicidad, 0);
+  assert.equal(diagnostico.evaluaciones, 0);
+  assert.equal(esSudokuValido(resultado.puzzle), true);
+  assert.equal(contarSolucionesIndependiente(resultado.puzzle, 2), 1);
+});
