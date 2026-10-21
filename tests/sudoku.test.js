@@ -237,6 +237,26 @@ test("crearPuzzle(solucion, 0) conserva una solución completa y válida", () =>
   assert.deepEqual(solucion, copiaSolucion);
 });
 
+test("crearPuzzle acepta objetivoVacias en los límites 0 y 81", () => {
+  const solucion = generarTableroResuelto();
+
+  assert.ok(crearPuzzle(solucion, 0));
+  assert.ok(
+    crearPuzzle(solucion, 81, { maxIntentos: 1, presupuestoMs: 1 })
+  );
+});
+
+test("crearPuzzle rechaza objetivoVacias fuera de rango o no entero", () => {
+  const solucion = generarTableroResuelto();
+  const invalidos = [-1, -81, 82, 1.5, NaN, Infinity, -Infinity, "36", null, undefined];
+
+  for (const objetivo of invalidos) {
+    assert.throws(() => crearPuzzle(solucion, objetivo), TypeError);
+  }
+
+  assert.throws(() => crearPuzzle(solucion), TypeError);
+});
+
 test("crearPuzzle devuelve el mejor puzzle válido si no alcanza el objetivo", () => {
   const solucion = generarTableroResuelto();
 

@@ -262,10 +262,21 @@ function esSolucionCompleta(tablero) {
  * con menos si sus técnicas de deducción son más directas.
  *
  * @param {number[][]} tableroResuelto - Solución completa (no se modifica).
- * @param {number} objetivoVacias - Casillas vacías deseadas.
+ * @param {number} objetivoVacias - Entero entre 0 y 81 (casillas vacías deseadas).
  * @param {{maxIntentos?: number, presupuestoMs?: number}} opciones
+ * @throws {TypeError} Si el objetivo no es un entero dentro del rango.
  */
 export function crearPuzzle(tableroResuelto, objetivoVacias, opciones = {}) {
+  if (
+    !Number.isInteger(objetivoVacias) ||
+    objetivoVacias < 0 ||
+    objetivoVacias > TAMAÑO * TAMAÑO
+  ) {
+    throw new TypeError(
+      `crearPuzzle espera objetivoVacias entero entre 0 y ${TAMAÑO * TAMAÑO}`
+    );
+  }
+
   if (!esSolucionCompleta(tableroResuelto)) {
     throw new TypeError(
       "crearPuzzle espera una solución completa y válida de Sudoku"
