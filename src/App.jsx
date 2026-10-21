@@ -17,6 +17,7 @@ const App = () => {
       <Cabecera
         dificultad={juego.dificultad}
         onCambiarDificultad={juego.cambiarDificultad}
+        deshabilitado={juego.generando}
         tema={tema}
         onAlternarTema={alternarTema}
       />

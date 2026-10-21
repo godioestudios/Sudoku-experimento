@@ -53,6 +53,7 @@ export function useSudoku() {
 
   const trabajadorRef = useRef(null);
   const solicitudRef = useRef(0);
+  const montadoRef = useRef(true);
   const partidaRef = useRef(partida);
 
   const { tableroSolucion, tableroJuego, celdasFijas, notas } = partida ?? {};
@@ -65,7 +66,7 @@ export function useSudoku() {
   // GENERACIÓN EN SEGUNDO PLANO
   // ----------------------------------------------------------
   const finalizarGeneracion = useCallback((id, respuesta) => {
-    if (id !== solicitudRef.current) return;
+    if (!montadoRef.current || id !== solicitudRef.current) return;
 
     try {
       const resultado = resolverGeneracion({
@@ -93,7 +94,7 @@ export function useSudoku() {
       setPartida(partidaRef.current);
       setEstado(`No se pudo generar el puzzle: ${error.message}`);
     } finally {
-      if (id === solicitudRef.current) {
+      if (montadoRef.current && id === solicitudRef.current) {
         setGenerando(false);
         setActiva(true);
       }
@@ -102,6 +103,8 @@ export function useSudoku() {
 
   const lanzarTrabajador = useCallback(
     (nivel) => {
+      if (!montadoRef.current) return;
+
       solicitudRef.current += 1;
       const id = solicitudRef.current;
 
@@ -145,6 +148,8 @@ export function useSudoku() {
 
   const iniciarGeneracion = useCallback(
     (nivel) => {
+      if (!montadoRef.current) return;
+
       setGenerando(true);
       setPausado(false);
       setSegundos(0);
@@ -156,8 +161,10 @@ export function useSudoku() {
   );
 
   useEffect(() => {
+    montadoRef.current = true;
     lanzarTrabajador("medio");
     return () => {
+      montadoRef.current = false;
       solicitudRef.current += 1;
       trabajadorRef.current?.terminate();
       trabajadorRef.current = null;

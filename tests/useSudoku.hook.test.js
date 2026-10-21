@@ -120,9 +120,13 @@ function montarHook() {
   const raiz = createRoot(contenedor);
   act(() => raiz.render(createElement(Sonda)));
 
+  let desmontado = false;
+
   return {
     resultado,
     desmontar() {
+      if (desmontado) return;
+      desmontado = true;
       act(() => raiz.unmount());
       contenedor.remove();
     },
@@ -233,6 +237,83 @@ test("cambiar de dificultad reinicia el progreso y descarta respuestas obsoletas
   assert.equal(resultado.current.seleccion, null);
   assert.equal(resultado.current.modoNotas, false);
   assert.equal(resultado.current.deshacerDisponible, false);
+});
+
+test("dos llamadas rápidas a nuevoJuego solo aplican la última", (t) => {
+  const { workers, montar } = preparar(t);
+  const { resultado } = montar();
+  const partida = crearPartida([[0, 0]]);
+
+  completarGeneracion(workers.instancias[0], partida);
+
+  ejecutar(() => resultado.current.nuevoJuego("facil"));
+  ejecutar(() => resultado.current.nuevoJuego("experto"));
+
+  assert.equal(workers.instancias.length, 3);
+  assert.equal(workers.instancias[1].terminado, true);
+  assert.deepEqual(workers.instancias[2].enviado, { id: 3, nivel: "experto" });
+  assert.equal(resultado.current.generando, true);
+
+  completarGeneracion(workers.instancias[1], crearPartida([[1, 1]]));
+  assert.equal(resultado.current.generando, true);
+  assert.deepEqual(resultado.current.tableroJuego, partida.tableroJuego);
+
+  const ultima = crearPartida([[2, 2]]);
+  completarGeneracion(workers.instancias[2], ultima);
+
+  assert.equal(resultado.current.generando, false);
+  assert.deepEqual(resultado.current.tableroJuego, ultima.tableroJuego);
+});
+
+test("varias dificultades rápidas descartan las generaciones intermedias", (t) => {
+  const { workers, montar } = preparar(t);
+  const { resultado } = montar();
+  const partida = crearPartida([[0, 0]]);
+
+  completarGeneracion(workers.instancias[0], partida);
+
+  ejecutar(() => resultado.current.cambiarDificultad("facil"));
+  ejecutar(() => resultado.current.cambiarDificultad("experto"));
+
+  assert.equal(resultado.current.dificultad, "experto");
+  assert.equal(workers.instancias.length, 3);
+  assert.equal(workers.instancias[1].terminado, true);
+  assert.deepEqual(workers.instancias[2].enviado, { id: 3, nivel: "experto" });
+
+  completarGeneracion(workers.instancias[1], crearPartida([[1, 1]]));
+  assert.equal(resultado.current.generando, true);
+  assert.deepEqual(resultado.current.tableroJuego, partida.tableroJuego);
+
+  const nueva = crearPartida([[2, 2]]);
+  completarGeneracion(workers.instancias[2], nueva);
+
+  assert.equal(resultado.current.generando, false);
+  assert.equal(resultado.current.dificultad, "experto");
+  assert.deepEqual(resultado.current.tableroJuego, nueva.tableroJuego);
+});
+
+test("desmontar durante una generación termina el trabajador y no inicia otros", (t) => {
+  const { workers, montar } = preparar(t);
+  const { resultado, desmontar } = montar();
+  const trabajador = workers.instancias[0];
+
+  assert.equal(trabajador.terminado, false);
+  desmontar();
+
+  assert.equal(trabajador.terminado, true);
+
+  const generandoAntes = resultado.current.generando;
+  const listoAntes = resultado.current.listo;
+
+  trabajador.emitirMensaje({
+    id: trabajador.enviado.id,
+    partida: crearPartida([[0, 0]]),
+  });
+  resultado.current.nuevoJuego("facil");
+
+  assert.equal(workers.instancias.length, 1);
+  assert.equal(resultado.current.generando, generandoAntes);
+  assert.equal(resultado.current.listo, listoAntes);
 });
 
 test("coloca números, cuenta errores y respeta las celdas fijas", (t) => {

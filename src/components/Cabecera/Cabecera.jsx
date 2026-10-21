@@ -7,6 +7,7 @@ const NIVELES = ["facil", "medio", "dificil", "experto"];
 export default function Cabecera({
   dificultad,
   onCambiarDificultad,
+  deshabilitado = false,
   tema,
   onAlternarTema,
 }) {
@@ -29,6 +30,7 @@ export default function Cabecera({
                 key={nivel}
                 type="button"
                 className={nivel === dificultad ? "activo" : ""}
+                disabled={deshabilitado}
                 onClick={() => onCambiarDificultad(nivel)}
               >
                 {NOMBRES_DIFICULTAD[nivel]}
