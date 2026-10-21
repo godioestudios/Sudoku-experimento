@@ -36,6 +36,22 @@ export function resolverGeneracion({ id, idVigente, partidaAnterior, respuesta }
 }
 
 /**
+ * Cuenta, para cada dígito, cuántas apariciones coinciden con la solución.
+ * Las celdas vacías y las colocaciones incorrectas no cuentan.
+ */
+export function contarDigitosCorrectos(tableroJuego, tableroSolucion) {
+  const conteo = Array(10).fill(0);
+  if (!tableroJuego || !tableroSolucion) return conteo;
+  for (let fila = 0; fila < TAMAÑO; fila++) {
+    for (let columna = 0; columna < TAMAÑO; columna++) {
+      const valor = tableroJuego[fila][columna];
+      if (valor !== 0 && valor === tableroSolucion[fila][columna]) conteo[valor]++;
+    }
+  }
+  return conteo;
+}
+
+/**
  * Concentra todo el estado y la lógica de una partida de Sudoku.
  */
 export function useSudoku() {
@@ -454,17 +470,10 @@ export function useSudoku() {
   // ----------------------------------------------------------
   // CONTADORES DEL TECLADO
   // ----------------------------------------------------------
-  const conteoDigitos = useMemo(() => {
-    const conteo = Array(10).fill(0);
-    if (!tableroJuego) return conteo;
-    for (let fila = 0; fila < TAMAÑO; fila++) {
-      for (let columna = 0; columna < TAMAÑO; columna++) {
-        const valor = tableroJuego[fila][columna];
-        if (valor !== 0) conteo[valor]++;
-      }
-    }
-    return conteo;
-  }, [tableroJuego]);
+  const conteoDigitos = useMemo(
+    () => contarDigitosCorrectos(tableroJuego, tableroSolucion),
+    [tableroJuego, tableroSolucion]
+  );
 
   return {
     // Datos
