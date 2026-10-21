@@ -43,7 +43,9 @@ const App = () => {
             onReanudar={juego.reanudar}
           />
         ) : (
-          <div className="tablero-cargando">Generando puzzle...</div>
+          <div className="tablero-cargando">
+            {juego.generando ? "Generando puzzle..." : juego.estado}
+          </div>
         )}
 
         <Teclado

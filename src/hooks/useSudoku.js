@@ -4,6 +4,38 @@ import { TAMAÑO, copiarNotas, copiarTablero } from "../utils/sudoku.js";
 const HISTORIAL_MAX = 200;
 
 /**
+ * Traduce la respuesta de una generación a un estado coherente.
+ * Devuelve null si la respuesta pertenece a una generación obsoleta.
+ */
+export function resolverGeneracion({ id, idVigente, partidaAnterior, respuesta }) {
+  if (id !== idVigente) return null;
+
+  const error = respuesta?.error
+    ? String(respuesta.error)
+    : respuesta?.partida
+      ? null
+      : "La generación no devolvió una partida válida.";
+
+  if (error) {
+    return {
+      partida: partidaAnterior,
+      error,
+      generando: false,
+      activa: true,
+      estado: `No se pudo generar el puzzle: ${error}`,
+    };
+  }
+
+  return {
+    partida: respuesta.partida,
+    error: null,
+    generando: false,
+    activa: true,
+    estado: "Selecciona una casilla y coloca un número.",
+  };
+}
+
+/**
  * Concentra todo el estado y la lógica de una partida de Sudoku.
  */
 export function useSudoku() {
@@ -21,61 +53,95 @@ export function useSudoku() {
 
   const trabajadorRef = useRef(null);
   const solicitudRef = useRef(0);
+  const partidaRef = useRef(partida);
 
   const { tableroSolucion, tableroJuego, celdasFijas, notas } = partida ?? {};
+
+  useEffect(() => {
+    partidaRef.current = partida;
+  }, [partida]);
 
   // ----------------------------------------------------------
   // GENERACIÓN EN SEGUNDO PLANO
   // ----------------------------------------------------------
-  const lanzarTrabajador = useCallback((nivel) => {
-    solicitudRef.current += 1;
-    const id = solicitudRef.current;
+  const finalizarGeneracion = useCallback((id, respuesta) => {
+    if (id !== solicitudRef.current) return;
 
-    trabajadorRef.current?.terminate();
-    trabajadorRef.current = null;
+    try {
+      const resultado = resolverGeneracion({
+        id,
+        idVigente: solicitudRef.current,
+        partidaAnterior: partidaRef.current,
+        respuesta,
+      });
+      if (!resultado) return;
 
-    const trabajador = new Worker(
-      new URL("../utils/generador.worker.js", import.meta.url),
-      { type: "module" }
-    );
-    trabajadorRef.current = trabajador;
+      setPartida(resultado.partida);
+      setEstado(resultado.estado);
 
-    trabajador.addEventListener("message", (evento) => {
-      if (evento.data.id !== solicitudRef.current) return;
-
-      trabajador.terminate();
-      if (trabajadorRef.current === trabajador) trabajadorRef.current = null;
-
-      const { partida: nuevaPartida, error } = evento.data;
-      if (error) {
-        setGenerando(false);
-        setActiva(true);
-        setEstado(`No se pudo generar el puzzle: ${error}`);
+      if (resultado.error) {
+        console.error(`Error al generar la partida: ${resultado.error}`);
         return;
       }
 
-      setPartida(nuevaPartida);
       setHistorial([]);
       setSeleccion(null);
       setErrores(0);
       setModoNotas(false);
-      setGenerando(false);
-      setEstado("Selecciona una casilla y coloca un número.");
-      setActiva(true);
-    });
-
-    trabajador.addEventListener("error", (evento) => {
-      if (trabajadorRef.current !== trabajador) return;
-
-      trabajador.terminate();
-      trabajadorRef.current = null;
-      setGenerando(false);
-      setActiva(true);
-      setEstado(`No se pudo generar el puzzle: ${evento.message}`);
-    });
-
-    trabajador.postMessage({ id, nivel });
+    } catch (error) {
+      console.error("Error al generar la partida:", error);
+      setPartida(partidaRef.current);
+      setEstado(`No se pudo generar el puzzle: ${error.message}`);
+    } finally {
+      if (id === solicitudRef.current) {
+        setGenerando(false);
+        setActiva(true);
+      }
+    }
   }, []);
+
+  const lanzarTrabajador = useCallback(
+    (nivel) => {
+      solicitudRef.current += 1;
+      const id = solicitudRef.current;
+
+      trabajadorRef.current?.terminate();
+      trabajadorRef.current = null;
+
+      let trabajador = null;
+      try {
+        trabajador = new Worker(
+          new URL("../utils/generador.worker.js", import.meta.url),
+          { type: "module" }
+        );
+        trabajadorRef.current = trabajador;
+
+        trabajador.addEventListener("message", (evento) => {
+          trabajador.terminate();
+          if (trabajadorRef.current === trabajador) trabajadorRef.current = null;
+
+          finalizarGeneracion(id, evento.data);
+        });
+
+        trabajador.addEventListener("error", (evento) => {
+          trabajador.terminate();
+          if (trabajadorRef.current === trabajador) trabajadorRef.current = null;
+
+          finalizarGeneracion(id, {
+            error: evento.message || "El trabajador de generación falló.",
+          });
+        });
+
+        trabajador.postMessage({ id, nivel });
+      } catch (error) {
+        trabajador?.terminate();
+        if (trabajadorRef.current === trabajador) trabajadorRef.current = null;
+
+        finalizarGeneracion(id, { error: error.message });
+      }
+    },
+    [finalizarGeneracion]
+  );
 
   const iniciarGeneracion = useCallback(
     (nivel) => {
