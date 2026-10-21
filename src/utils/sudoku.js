@@ -205,6 +205,45 @@ function intentoDeVaciado(tableroResuelto, objetivoVacias) {
 }
 
 /**
+ * Comprueba que el tablero sea una solución completa: 9x9, valores
+ * enteros de 1 a 9 y sin repetidos en fila, columna ni caja.
+ */
+function esSolucionCompleta(tablero) {
+  if (!Array.isArray(tablero) || tablero.length !== TAMAÑO) return false;
+
+  for (const fila of tablero) {
+    if (!Array.isArray(fila) || fila.length !== TAMAÑO) return false;
+    for (const valor of fila) {
+      if (!Number.isInteger(valor) || valor < 1 || valor > TAMAÑO) return false;
+    }
+  }
+
+  for (let indice = 0; indice < TAMAÑO; indice++) {
+    const fila = new Set(tablero[indice]);
+    const columna = new Set(tablero.map((f) => f[indice]));
+    if (fila.size !== TAMAÑO || columna.size !== TAMAÑO) return false;
+  }
+
+  for (let inicioFila = 0; inicioFila < TAMAÑO; inicioFila += TAMAÑO_CAJA) {
+    for (
+      let inicioColumna = 0;
+      inicioColumna < TAMAÑO;
+      inicioColumna += TAMAÑO_CAJA
+    ) {
+      const caja = new Set();
+      for (let i = 0; i < TAMAÑO_CAJA; i++) {
+        for (let j = 0; j < TAMAÑO_CAJA; j++) {
+          caja.add(tablero[inicioFila + i][inicioColumna + j]);
+        }
+      }
+      if (caja.size !== TAMAÑO) return false;
+    }
+  }
+
+  return true;
+}
+
+/**
  * Vacía casillas del tablero resuelto para crear el puzzle,
  * cuidando que siga teniendo UNA ÚNICA solución.
  *
@@ -227,6 +266,12 @@ function intentoDeVaciado(tableroResuelto, objetivoVacias) {
  * @param {{maxIntentos?: number, presupuestoMs?: number}} opciones
  */
 export function crearPuzzle(tableroResuelto, objetivoVacias, opciones = {}) {
+  if (!esSolucionCompleta(tableroResuelto)) {
+    throw new TypeError(
+      "crearPuzzle espera una solución completa y válida de Sudoku"
+    );
+  }
+
   const maxIntentos = Math.max(1, opciones.maxIntentos ?? 5);
   const presupuestoMs = opciones.presupuestoMs ?? 3000;
   const inicio = performance.now();

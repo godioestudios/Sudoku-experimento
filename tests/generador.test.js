@@ -1,0 +1,50 @@
+import test from "node:test";
+import assert from "node:assert/strict";
+
+import { copiarTablero, contarSoluciones } from "../src/utils/sudoku.js";
+import { procesarSolicitud } from "../src/utils/generador.js";
+
+const TAM = 9;
+
+function contarVacias(tablero) {
+  return tablero.flat().filter((valor) => valor === 0).length;
+}
+
+test("procesarSolicitud responde con el id y una partida válida", () => {
+  const respuesta = procesarSolicitud({ id: 42, nivel: "facil" });
+
+  assert.equal(respuesta.id, 42);
+  assert.equal(respuesta.error, undefined);
+
+  const { partida } = respuesta;
+  assert.ok(partida);
+  assert.equal(partida.tableroSolucion.length, TAM);
+  assert.equal(partida.tableroJuego.length, TAM);
+
+  // Las pistas del tablero de juego coinciden con la solución y el puzzle
+  // conserva una única solución.
+  for (let fila = 0; fila < TAM; fila++) {
+    for (let columna = 0; columna < TAM; columna++) {
+      if (partida.celdasFijas[fila][columna]) {
+        assert.equal(
+          partida.tableroJuego[fila][columna],
+          partida.tableroSolucion[fila][columna]
+        );
+      }
+    }
+  }
+
+  assert.ok(contarVacias(partida.tableroJuego) > 0);
+  assert.equal(contarSoluciones(copiarTablero(partida.tableroJuego), 2), 1);
+  for (const fila of partida.notas) {
+    for (const candidatos of fila) assert.equal(candidatos.size, 0);
+  }
+});
+
+test("procesarSolicitud devuelve el error con el mismo id", () => {
+  const respuesta = procesarSolicitud({ id: 7, nivel: "inexistente" });
+
+  assert.equal(respuesta.id, 7);
+  assert.match(respuesta.error, /Dificultad desconocida/);
+  assert.equal(respuesta.partida, undefined);
+});

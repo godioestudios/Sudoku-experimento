@@ -1,50 +1,108 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
-import {
-  DIFICULTADES,
-  TAMAÑO,
-  copiarNotas,
-  copiarTablero,
-  crearNotasVacias,
-  crearPuzzle,
-  generarTableroResuelto,
-} from "../utils/sudoku.js";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { TAMAÑO, copiarNotas, copiarTablero } from "../utils/sudoku.js";
 
 const HISTORIAL_MAX = 200;
-
-/** Genera una partida completa (solución, puzzle, celdas fijas y apuntes). */
-function prepararPartida(nivel) {
-  const tableroSolucion = generarTableroResuelto();
-  const puzzle = crearPuzzle(tableroSolucion, DIFICULTADES[nivel]);
-  return {
-    tableroSolucion,
-    tableroJuego: copiarTablero(puzzle),
-    celdasFijas: puzzle.map((fila) => fila.map((valor) => valor !== 0)),
-    notas: crearNotasVacias(),
-  };
-}
 
 /**
  * Concentra todo el estado y la lógica de una partida de Sudoku.
  */
 export function useSudoku() {
   const [dificultad, setDificultad] = useState("medio");
-  const [partida, setPartida] = useState(() => prepararPartida("medio"));
+  const [partida, setPartida] = useState(null);
   const [seleccion, setSeleccion] = useState(null);
   const [historial, setHistorial] = useState([]);
   const [modoNotas, setModoNotas] = useState(false);
   const [errores, setErrores] = useState(0);
   const [segundos, setSegundos] = useState(0);
   const [pausado, setPausado] = useState(false);
-  const [activa, setActiva] = useState(true);
-  const [generando, setGenerando] = useState(false);
-  const [estado, setEstado] = useState("Selecciona una casilla y coloca un número.");
+  const [activa, setActiva] = useState(false);
+  const [generando, setGenerando] = useState(true);
+  const [estado, setEstado] = useState("Generando puzzle...");
 
-  const { tableroSolucion, tableroJuego, celdasFijas, notas } = partida;
+  const trabajadorRef = useRef(null);
+  const solicitudRef = useRef(0);
+
+  const { tableroSolucion, tableroJuego, celdasFijas, notas } = partida ?? {};
+
+  // ----------------------------------------------------------
+  // GENERACIÓN EN SEGUNDO PLANO
+  // ----------------------------------------------------------
+  const lanzarTrabajador = useCallback((nivel) => {
+    solicitudRef.current += 1;
+    const id = solicitudRef.current;
+
+    trabajadorRef.current?.terminate();
+    trabajadorRef.current = null;
+
+    const trabajador = new Worker(
+      new URL("../utils/generador.worker.js", import.meta.url),
+      { type: "module" }
+    );
+    trabajadorRef.current = trabajador;
+
+    trabajador.addEventListener("message", (evento) => {
+      if (evento.data.id !== solicitudRef.current) return;
+
+      trabajador.terminate();
+      if (trabajadorRef.current === trabajador) trabajadorRef.current = null;
+
+      const { partida: nuevaPartida, error } = evento.data;
+      if (error) {
+        setGenerando(false);
+        setActiva(true);
+        setEstado(`No se pudo generar el puzzle: ${error}`);
+        return;
+      }
+
+      setPartida(nuevaPartida);
+      setHistorial([]);
+      setSeleccion(null);
+      setErrores(0);
+      setModoNotas(false);
+      setGenerando(false);
+      setEstado("Selecciona una casilla y coloca un número.");
+      setActiva(true);
+    });
+
+    trabajador.addEventListener("error", (evento) => {
+      if (trabajadorRef.current !== trabajador) return;
+
+      trabajador.terminate();
+      trabajadorRef.current = null;
+      setGenerando(false);
+      setActiva(true);
+      setEstado(`No se pudo generar el puzzle: ${evento.message}`);
+    });
+
+    trabajador.postMessage({ id, nivel });
+  }, []);
+
+  const iniciarGeneracion = useCallback(
+    (nivel) => {
+      setGenerando(true);
+      setPausado(false);
+      setSegundos(0);
+      setEstado("Generando puzzle...");
+      setActiva(false);
+      lanzarTrabajador(nivel);
+    },
+    [lanzarTrabajador]
+  );
+
+  useEffect(() => {
+    lanzarTrabajador("medio");
+    return () => {
+      solicitudRef.current += 1;
+      trabajadorRef.current?.terminate();
+      trabajadorRef.current = null;
+    };
+  }, [lanzarTrabajador]);
 
   // ----------------------------------------------------------
   // VICTORIA (derivada del tablero, sin efectos)
   // ----------------------------------------------------------
   const victoria = useMemo(() => {
+    if (!tableroJuego || !tableroSolucion) return false;
     for (let fila = 0; fila < TAMAÑO; fila++) {
       for (let columna = 0; columna < TAMAÑO; columna++) {
         if (tableroJuego[fila][columna] !== tableroSolucion[fila][columna]) return false;
@@ -82,26 +140,8 @@ export function useSudoku() {
   // NUEVA PARTIDA
   // ----------------------------------------------------------
   const nuevoJuego = useCallback(
-    (nivel = dificultad) => {
-      setGenerando(true);
-      setPausado(false);
-      setSegundos(0);
-      setEstado("Generando puzzle...");
-      setActiva(false);
-
-      // Retardo mínimo para que el navegador pinte el mensaje antes de calcular
-      setTimeout(() => {
-        setPartida(prepararPartida(nivel));
-        setHistorial([]);
-        setSeleccion(null);
-        setErrores(0);
-        setModoNotas(false);
-        setGenerando(false);
-        setEstado("Selecciona una casilla y coloca un número.");
-        setActiva(true);
-      }, 40);
-    },
-    [dificultad]
+    (nivel = dificultad) => iniciarGeneracion(nivel),
+    [dificultad, iniciarGeneracion]
   );
 
   // ----------------------------------------------------------
@@ -332,6 +372,7 @@ export function useSudoku() {
   // ----------------------------------------------------------
   const conteoDigitos = useMemo(() => {
     const conteo = Array(10).fill(0);
+    if (!tableroJuego) return conteo;
     for (let fila = 0; fila < TAMAÑO; fila++) {
       for (let columna = 0; columna < TAMAÑO; columna++) {
         const valor = tableroJuego[fila][columna];
@@ -358,7 +399,7 @@ export function useSudoku() {
     estado: victoria ? "¡Sudoku completado!" : estado,
     conteoDigitos,
     deshacerDisponible: historial.length > 0,
-    listo: tableroJuego !== null,
+    listo: partida !== null,
     // Acciones
     seleccionarCelda,
     colocarNumero,
