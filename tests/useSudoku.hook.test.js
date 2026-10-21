@@ -1142,6 +1142,117 @@ test("los atajos normales N, H y Z siguen funcionando", (t) => {
   assert.equal(resultado.current.deshacerDisponible, false);
 });
 
+function abrirModal() {
+  const modal = document.createElement("div");
+  modal.setAttribute("role", "dialog");
+  modal.setAttribute("aria-modal", "true");
+  document.body.appendChild(modal);
+  return () => modal.remove();
+}
+
+test("los atajos del tablero no se ejecutan mientras un modal está abierto", (t) => {
+  const { workers, montar } = preparar(t);
+  const { resultado } = montar();
+  const partida = crearPartida([[0, 0], [0, 1]]);
+
+  t.mock.method(Math, "random", () => 0);
+  completarGeneracion(workers.instancias[0], partida);
+
+  ejecutar(() => resultado.current.seleccionarCelda(0, 0));
+  ejecutar(() => resultado.current.colocarNumero(partida.tableroSolucion[0][0]));
+  const tableroAntes = resultado.current.tableroJuego.map((fila) => [...fila]);
+
+  const cerrarModal = abrirModal();
+
+  presionar("n");
+  presionar("h");
+  presionar("z");
+  presionar(String(partida.tableroSolucion[0][1]));
+
+  assert.equal(resultado.current.modoNotas, false);
+  assert.equal(resultado.current.pistasRestantes, 3);
+  assert.deepEqual(resultado.current.tableroJuego, tableroAntes);
+  assert.equal(resultado.current.deshacerDisponible, true);
+  assert.deepEqual(resultado.current.seleccion, { fila: 0, columna: 0 });
+
+  cerrarModal();
+});
+
+test("al cerrar el modal vuelven a funcionar los atajos", (t) => {
+  const { workers, montar } = preparar(t);
+  const { resultado } = montar();
+  const partida = crearPartida([[0, 0], [0, 1]]);
+
+  t.mock.method(Math, "random", () => 0);
+  completarGeneracion(workers.instancias[0], partida);
+
+  const cerrarModal = abrirModal();
+  presionar("n");
+  assert.equal(resultado.current.modoNotas, false);
+
+  cerrarModal();
+  presionar("n");
+  assert.equal(resultado.current.modoNotas, true);
+
+  presionar("h");
+  assert.equal(resultado.current.pistasRestantes, 2);
+  assert.equal(resultado.current.tableroJuego[0][0], partida.tableroSolucion[0][0]);
+});
+
+test("con varios modales los atajos recién vuelven al cerrar el último", (t) => {
+  const { workers, montar } = preparar(t);
+  const { resultado } = montar();
+  const partida = crearPartida([[0, 0]]);
+
+  completarGeneracion(workers.instancias[0], partida);
+
+  const cerrarPrimero = abrirModal();
+  const cerrarSegundo = abrirModal();
+
+  presionar("n");
+  assert.equal(resultado.current.modoNotas, false);
+
+  cerrarPrimero();
+  presionar("n");
+  assert.equal(resultado.current.modoNotas, false);
+
+  cerrarSegundo();
+  presionar("n");
+  assert.equal(resultado.current.modoNotas, true);
+});
+
+test("abrir y cerrar modales varias veces no duplica el listener de teclado", (t) => {
+  const { workers, montar } = preparar(t);
+  const { resultado } = montar();
+  const partida = crearPartida([[0, 0]]);
+
+  completarGeneracion(workers.instancias[0], partida);
+
+  for (let i = 0; i < 3; i++) {
+    const cerrarModal = abrirModal();
+    presionar("n");
+    cerrarModal();
+  }
+
+  presionar("n");
+  assert.equal(resultado.current.modoNotas, true);
+});
+
+test("Escape dentro de un modal no dispara el atajo del tablero", (t) => {
+  const { workers, montar } = preparar(t);
+  const { resultado } = montar();
+  const partida = crearPartida([[0, 0]]);
+
+  completarGeneracion(workers.instancias[0], partida);
+  ejecutar(() => resultado.current.seleccionarCelda(0, 0));
+
+  const cerrarModal = abrirModal();
+  presionar("Escape");
+  cerrarModal();
+
+  assert.deepEqual(resultado.current.seleccion, { fila: 0, columna: 0 });
+});
+
 test("los atajos se ignoran con Ctrl, Meta o Alt y no bloquean al navegador", (t) => {
   const { workers, montar } = preparar(t);
   const { resultado } = montar();

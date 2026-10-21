@@ -8,6 +8,10 @@ import {
 
 const HISTORIAL_MAX = 200;
 
+// Los modales se renderizan con aria-modal; su presencia real es la fuente de
+// verdad, incluso con varios abiertos o al cerrarse uno de ellos.
+const SELECTOR_MODAL = '[aria-modal="true"]';
+
 // Reloj monotónico: no lo afectan los ajustes del reloj del sistema.
 // Fallback para entornos antiguos sin performance.now.
 const ahora = () =>
@@ -550,6 +554,10 @@ export function useSudoku({ pistasMaximas = PISTAS_MAXIMAS } = {}) {
       }
 
       if (!activa) return;
+
+      // Con un diálogo modal abierto, el tablero no responde a atajos.
+      // Escape y Tab los maneja useDialogoModal en fase de captura.
+      if (document.querySelector(SELECTOR_MODAL)) return;
 
       // Con la partida en pausa, la tecla P reanuda y nada más se procesa
       if (pausado) {
