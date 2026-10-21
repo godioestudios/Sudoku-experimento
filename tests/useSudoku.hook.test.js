@@ -442,6 +442,87 @@ test("los apuntes alternan candidatos y se limpian al colocar un número", (t) =
   assert.equal(resultado.current.notas[0][0].size, 0);
 });
 
+const TODOS = [1, 2, 3, 4, 5, 6, 7, 8, 9];
+
+function apuntesDe(resultado, fila, columna) {
+  return [...resultado.current.notas[fila][columna]].sort((a, b) => a - b);
+}
+
+function prepararColocacionConApuntes(t, celdas) {
+  const { workers, montar } = preparar(t);
+  const { resultado } = montar();
+  const partida = crearPartida(celdas);
+
+  for (let fila = 0; fila < TAM; fila++) {
+    for (let columna = 0; columna < TAM; columna++) {
+      partida.notas[fila][columna] = new Set(TODOS);
+    }
+  }
+
+  completarGeneracion(workers.instancias[0], partida);
+  const numero = partida.tableroSolucion[0][0];
+  ejecutar(() => resultado.current.seleccionarCelda(0, 0));
+  ejecutar(() => resultado.current.colocarNumero(numero));
+
+  return { resultado, partida, numero };
+}
+
+test("colocar un número limpia el candidato de la misma fila", (t) => {
+  const { resultado, numero } = prepararColocacionConApuntes(t, [[0, 0], [0, 1], [0, 8]]);
+
+  assert.equal(resultado.current.notas[0][1].has(numero), false);
+  assert.equal(resultado.current.notas[0][8].has(numero), false);
+});
+
+test("colocar un número limpia el candidato de la misma columna", (t) => {
+  const { resultado, numero } = prepararColocacionConApuntes(t, [[0, 0], [8, 0]]);
+
+  assert.equal(resultado.current.notas[8][0].has(numero), false);
+});
+
+test("colocar un número limpia el candidato de la misma caja", (t) => {
+  const { resultado, numero } = prepararColocacionConApuntes(t, [[0, 0], [1, 1]]);
+
+  assert.equal(resultado.current.notas[1][1].has(numero), false);
+});
+
+test("la limpieza conserva los demás candidatos de las celdas afectadas", (t) => {
+  const { resultado, numero } = prepararColocacionConApuntes(t, [[0, 0], [0, 1]]);
+
+  assert.deepEqual(
+    apuntesDe(resultado, 0, 1),
+    TODOS.filter((candidato) => candidato !== numero)
+  );
+});
+
+test("la limpieza no toca apuntes fuera de fila, columna y caja ni celdas fijas", (t) => {
+  const { resultado, numero } = prepararColocacionConApuntes(t, [[0, 0], [4, 4]]);
+
+  assert.deepEqual(apuntesDe(resultado, 4, 4), TODOS);
+  assert.deepEqual(apuntesDe(resultado, 0, 1), TODOS);
+  assert.equal(resultado.current.notas[0][1].has(numero), true);
+});
+
+test("deshacer una colocación restaura los apuntes eliminados", (t) => {
+  const { resultado, numero } = prepararColocacionConApuntes(t, [
+    [0, 0],
+    [0, 1],
+    [8, 0],
+    [1, 1],
+    [4, 4],
+  ]);
+
+  assert.equal(resultado.current.notas[0][1].has(numero), false);
+
+  ejecutar(() => resultado.current.deshacer());
+
+  assert.equal(resultado.current.tableroJuego[0][0], 0);
+  assert.deepEqual(apuntesDe(resultado, 0, 1), TODOS);
+  assert.deepEqual(apuntesDe(resultado, 8, 0), TODOS);
+  assert.deepEqual(apuntesDe(resultado, 1, 1), TODOS);
+  assert.deepEqual(apuntesDe(resultado, 4, 4), TODOS);
+});
+
 test("deshacer restaura tablero, apuntes y errores", (t) => {
   const { workers, montar } = preparar(t);
   const { resultado } = montar();

@@ -276,6 +276,24 @@ export function useSudoku() {
           nuevoTablero[fila][columna] = numero;
           const nuevasNotas = copiarNotas(previo.notas);
           nuevasNotas[fila][columna].clear();
+
+          if (numero !== 0) {
+            const limpiar = (f, c) => {
+              if (!previo.celdasFijas[f][c]) nuevasNotas[f][c].delete(numero);
+            };
+            for (let i = 0; i < TAMAÑO; i++) {
+              limpiar(fila, i);
+              limpiar(i, columna);
+            }
+            const cajaFila = Math.floor(fila / 3) * 3;
+            const cajaColumna = Math.floor(columna / 3) * 3;
+            for (let f = cajaFila; f < cajaFila + 3; f++) {
+              for (let c = cajaColumna; c < cajaColumna + 3; c++) {
+                limpiar(f, c);
+              }
+            }
+          }
+
           return { ...previo, tableroJuego: nuevoTablero, notas: nuevasNotas };
         });
 
